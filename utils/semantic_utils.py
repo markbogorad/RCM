@@ -10,6 +10,7 @@ target_sentences = [
     "private client portfolio management"
     "gatekeeper"
 ]
+
 target_embedding = model.encode(target_sentences, convert_to_tensor=True)
 
 def semantic_score(text: str) -> float:
