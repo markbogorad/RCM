@@ -1,5 +1,6 @@
 import re
 import requests
+import pandas as pd
 from utils.serpapi_utils import google_search_results
 
 # Wide array of patterns, no domain attached
@@ -18,11 +19,14 @@ def generate_email_usernames(first, last):
     ))
 
 def run_reverse_search(first, last, company, title=None, max_results=10):
-    query_parts = [f'"{first} {last}"', company]
-    if title:
-        query_parts.append(title)
-    query = " ".join(query_parts)
+    query_parts = [f'"{first} {last}"', company, title]
+
+    # Filter out anything that's None or NaN before joining
+    filtered_parts = [str(part) for part in query_parts if part and not pd.isna(part)]
+
+    query = " ".join(filtered_parts)
     return google_search_results(query, max_results=max_results)
+
 
 def fetch_html_from_url(url):
     try:

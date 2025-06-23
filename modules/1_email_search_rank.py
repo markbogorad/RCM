@@ -113,7 +113,7 @@ def run_email_rank_page():
     # Download Template Button
     st.markdown("### 📄 Download CSV Template")
     template_headers = [
-        "First Name", "Last Name", "Title", "Phone Number", "Company",
+        "First Name", "Last Name", "Company", "Title", "Phone Number",
         "Street", "City", "State", "Zip", "Country", "CRD#"
     ]
     template_df = pd.DataFrame(columns=template_headers)
