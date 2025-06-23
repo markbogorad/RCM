@@ -19,7 +19,7 @@ st.markdown("<h1 style='text-align: center;'>🏛️ RAM Sales Research Toolkit<
 st.markdown("")
 
 # --- Top-level tabs ---
-tabs = st.tabs(["📧 Email Search", "🔍 Discovery", "📍 Location Query"])
+tabs = st.tabs(["📧 Email Search", "📍 Prospecting", " Coming Soon "])
 
 # --- Email Search Tab ---
 with tabs[0]:
@@ -27,7 +27,7 @@ with tabs[0]:
 
 # --- Discovery Tab ---
 with tabs[1]:
-    st.subheader("🔍 Website Semantic Discovery")
+    st.subheader("🔍 Prospecting")
     query = st.text_input("Enter a search query", value="top wealth management firms 2024")
 
 # --- Location Tab ---

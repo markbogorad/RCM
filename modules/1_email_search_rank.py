@@ -1,9 +1,11 @@
 import streamlit as st
+import pandas as pd
+import io
+import time
+
 from utils.semantic_utils import get_reference_embeddings
 from utils.scoring_utils import score_candidates, summarize_hits
 from utils.analytics_utils import compute_word_frequencies, render_summary_table
-import time
-
 from utils.scraper_utils import (
     run_reverse_search,
     fetch_html_from_url,
@@ -11,9 +13,6 @@ from utils.scraper_utils import (
     extract_all_emails,
     match_username_to_name,
 )
-from utils.semantic_utils import get_reference_embeddings
-from utils.scoring_utils import score_candidates, summarize_hits
-from utils.analytics_utils import compute_word_frequencies
 
 def run_email_discovery(first, last, company, title=None):
     name = f"{first} {last}"
@@ -38,7 +37,6 @@ def run_email_discovery(first, last, company, title=None):
         for email in found_emails:
             username = email.split("@")[0]
             if match_username_to_name(username, first, last):
-                # Pair email with best available snippet from same page
                 context = next((s for s in snippets if username in s), snippets[0] if snippets else "")
                 all_candidates.append((email, context))
 
@@ -107,3 +105,49 @@ def run_email_rank_page():
             st.markdown("### 🔠 Most Common Words")
             for word, count in word_freq:
                 st.markdown(f"- **{word}** ({count})")
+
+    # --- CSV Upload Section ---
+    st.markdown("---")
+    st.subheader("📁 Batch Upload (CSV)")
+
+    # Download Template Button
+    st.markdown("### 📄 Download CSV Template")
+    template_headers = [
+        "First Name", "Last Name", "Title", "Phone Number", "Company",
+        "Street", "City", "State", "Zip", "Country", "CRD#"
+    ]
+    template_df = pd.DataFrame(columns=template_headers)
+    buffer = io.BytesIO()
+    template_df.to_csv(buffer, index=False)
+    buffer.seek(0)
+    st.download_button(
+        label="📥 Download Template CSV",
+        data=buffer,
+        file_name="email_search_template.csv",
+        mime="text/csv"
+    )
+
+    # Upload Area
+    uploaded_file = st.file_uploader("Upload CSV with at least: First Name, Last Name, Company", type=["csv"])
+
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
+        required_cols = {"First Name", "Last Name", "Company"}
+
+        if not required_cols.issubset(df.columns):
+            st.error("CSV must contain at least: First Name, Last Name, Company.")
+        else:
+            st.success(f"Found {len(df)} rows. Starting batch search...")
+
+            for i, row in df.iterrows():
+                st.markdown(f"### 🔎 {i+1}. {row['First Name']} {row['Last Name']} ({row['Company']})")
+                with st.spinner("Scanning..."):
+                    results, summary, word_freq = run_email_discovery(
+                        row["First Name"], row["Last Name"], row["Company"], title=row.get("Title", None)
+                    )
+
+                if results:
+                    best_email, _, best_score = results[0]
+                    st.markdown(f"**Top Email:** `{best_email}` — Score: `{best_score:.4f}`")
+                else:
+                    st.warning("No email found.")
