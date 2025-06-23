@@ -1,23 +1,33 @@
-import torch
 from sentence_transformers import SentenceTransformer, util
 
+# Load SBERT model once
+_model = SentenceTransformer("all-MiniLM-L6-v2")
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
-target_sentences = [
-    "investment strategy research",
-    "wealth management insights",
-    "contact head of research or CIO",
-    "private client portfolio management"
-    "gatekeeper"
+# Centralized domain reference phrases (editable in one place only)
+_REFERENCE_PHRASES = [
+    "wealth management",
+    "institutional sales",
+    "private client advisor",
+    "financial advisor",
+    "portfolio construction",
+    "alternative investments"
 ]
 
-target_embedding = model.encode(target_sentences, convert_to_tensor=True)
+def get_model():
+    return _model
 
-def semantic_score(text: str) -> float:
-    try:
-        embedding = model.encode(text, convert_to_tensor=True)
-        score = util.cos_sim(embedding, target_embedding).mean().item()
-        return round(score, 4)
-    except Exception as e:
-        print(f"Embedding failed: {e}")
-        return 0.0
+def get_reference_phrases():
+    return _REFERENCE_PHRASES
+
+def get_reference_embeddings():
+    return _model.encode(_REFERENCE_PHRASES, convert_to_tensor=True)
+
+def embed_text(text):
+    return _model.encode(text, convert_to_tensor=True)
+
+def semantic_score(text, reference_embeddings=None):
+    if reference_embeddings is None:
+        reference_embeddings = get_reference_embeddings()
+    embedding = embed_text(text)
+    cosine_scores = util.cos_sim(embedding, reference_embeddings)
+    return float(cosine_scores.max())

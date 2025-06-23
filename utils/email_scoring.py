@@ -1,34 +1,28 @@
-# utils/email_scoring.py
 import re
 from bs4 import BeautifulSoup
-from sentence_transformers import SentenceTransformer, util
-import requests
+from utils.semantic_utils import semantic_score
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+EMAIL_REGEX = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
 
-REFERENCE_CONTEXTS = [
-    "managing director of wealth management",
-    "private client advisory services",
-    "contact our institutional sales team",
-    "financial advisor for private clients",
-    "reach out to our investment advisor"
-]
-REFERENCE_EMBEDDINGS = model.encode(REFERENCE_CONTEXTS, convert_to_tensor=True)
-
-def extract_emails_and_context(html, window=300):
-    emails_with_context = []
-    text = BeautifulSoup(html, "html.parser").get_text(separator=" ")
-    matches = list(re.finditer(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", text))
-    for match in matches:
-        start, end = match.span()
-        context = text[max(0, start-window): min(len(text), end+window)]
-        emails_with_context.append((match.group(), context))
-    return emails_with_context
-
-def score_email_contexts(email_contexts):
+def extract_emails_and_context(html, window=250):
+    soup = BeautifulSoup(html, "html.parser")
+    text = soup.get_text(separator=" ", strip=True)
+    matches = list(re.finditer(EMAIL_REGEX, text))
+    
     results = []
-    for email, context in email_contexts:
-        context_embedding = model.encode(context, convert_to_tensor=True)
-        similarity = util.cos_sim(context_embedding, REFERENCE_EMBEDDINGS).max().item()
-        results.append((email, context, similarity))
+    for match in matches:
+        start = max(0, match.start() - window)
+        end = match.end() + window
+        context = text[start:end]
+        results.append((match.group(), context))
+    return results
+
+def score_email_contexts(email_context_pairs):
+    results = []
+    for email, context in email_context_pairs:
+        try:
+            score = semantic_score(context)
+            results.append((email, context, score))
+        except Exception:
+            continue
     return sorted(results, key=lambda x: x[2], reverse=True)

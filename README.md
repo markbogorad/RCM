@@ -11,6 +11,39 @@
 - Salesforce 6/18 clean (state fill, dupe check)
 
 ### Week 4
+- Email Semantic scoring
+
+                ┌──────────────┐
+                │ User Inputs  │
+                └────┬─────────┘
+                     ▼
+         ┌────────────────────────┐
+         │ scraper_utils.py       │
+         │ - Remix emails         │
+         │ - Google SERP queries  │
+         │ - Reverse discovery    │
+         └────┬───────────────────┘
+              ▼
+     ┌──────────────────────┐
+     │ semantic_utils.py    │ ← SBERT
+     │ - Embed text         │
+     │ - Compute similarity │
+     └──────────┬───────────┘
+                ▼
+       ┌──────────────────────┐
+       │ scoring_utils.py     │
+       │ - Rank matches       │
+       │ - Combine scores     │
+       │ - Flag risks         │
+       └────────┬─────────────┘
+                ▼
+    ┌─────────────────────────┐
+    │ analytics_utils.py      │
+    │ - Most common words     │
+    │ - # pages scanned       │
+    │ - Domain pattern hits   │
+    └─────────────────────────┘
+
 - Database + agent for quick DDQ and Tracey market reports generation and navigation
 
 ### Week 5

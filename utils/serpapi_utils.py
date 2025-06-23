@@ -1,7 +1,7 @@
 import requests
 from utils.config import SERPAPI_KEY, MAX_RESULTS
 
-def get_urls_from_query(query):
+def google_search_results(query, max_results=5):
     params = {
         "engine": "google",
         "q": query,
@@ -10,7 +10,7 @@ def get_urls_from_query(query):
     try:
         response = requests.get("https://serpapi.com/search", params=params, timeout=10)
         data = response.json()
-        return [res["link"] for res in data.get("organic_results", [])][:MAX_RESULTS]
+        return data.get("organic_results", [])[:max_results]
     except Exception as e:
         print(f"SERPAPI failed: {e}")
         return []
