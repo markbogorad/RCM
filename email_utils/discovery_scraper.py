@@ -1,8 +1,8 @@
 # discovery_scraper.py
 import requests
 from bs4 import BeautifulSoup
-from utils.serpapi_utils import get_urls_from_query
-from utils.semantic_utils import semantic_score
+from email_utils.serpapi_utils import get_urls_from_query
+from email_utils.semantic_utils import semantic_score
 
 def get_clean_text(url):
     try:

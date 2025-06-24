@@ -1,7 +1,7 @@
 import re
 import requests
 import pandas as pd
-from utils.serpapi_utils import google_search_results
+from email_utils.serpapi_utils import google_search_results
 
 # Wide array of patterns, no domain attached
 USERNAME_PATTERNS = [

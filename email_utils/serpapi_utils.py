@@ -1,5 +1,5 @@
 import requests
-from utils.config import SERPAPI_KEY, MAX_RESULTS
+from email_utils.config import SERPAPI_KEY, MAX_RESULTS
 
 def google_search_results(query, max_results=5):
     params = {

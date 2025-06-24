@@ -3,10 +3,10 @@ import pandas as pd
 import io
 import time
 
-from utils.semantic_utils import get_reference_embeddings
-from utils.scoring_utils import score_candidates, summarize_hits
-from utils.analytics_utils import compute_word_frequencies, render_summary_table
-from utils.scraper_utils import (
+from email_utils.semantic_utils import get_reference_embeddings
+from email_utils.scoring_utils import score_candidates, summarize_hits
+from email_utils.analytics_utils import compute_word_frequencies, render_summary_table
+from email_utils.scraper_utils import (
     run_reverse_search,
     fetch_html_from_url,
     extract_named_snippets,

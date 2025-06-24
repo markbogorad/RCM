@@ -1,6 +1,6 @@
 import re
 from bs4 import BeautifulSoup
-from utils.semantic_utils import semantic_score
+from email_utils.semantic_utils import semantic_score
 
 EMAIL_REGEX = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
 

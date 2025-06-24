@@ -2,7 +2,7 @@ import streamlit as st
 import importlib.util
 import sys
 
-# --- Load module with non-standard filename ---
+# --- Load modules dynamically ---
 def load_module_as(name, filepath):
     spec = importlib.util.spec_from_file_location(name, filepath)
     module = importlib.util.module_from_spec(spec)
@@ -11,6 +11,7 @@ def load_module_as(name, filepath):
     return module
 
 email_search_page = load_module_as("email_search_rank", "modules/1_email_search_rank.py")
+prospecting_page = load_module_as("prospecting_map", "modules/2_prospect_search.py")
 
 # --- Streamlit config ---
 st.set_page_config(page_title="Wealth Research Toolkit", layout="wide")
@@ -19,18 +20,17 @@ st.markdown("<h1 style='text-align: center;'>🏛️ RAM Sales Research Toolkit<
 st.markdown("")
 
 # --- Top-level tabs ---
-tabs = st.tabs(["📧 Email Search", "📍 Prospecting", " Coming Soon "])
+tabs = st.tabs(["📧 Email Search", "📍 Prospecting", "🧭 Location Query (Soon)"])
 
 # --- Email Search Tab ---
 with tabs[0]:
     email_search_page.run_email_rank_page()
 
-# --- Discovery Tab ---
+# --- Prospecting Tab ---
 with tabs[1]:
-    st.subheader("🔍 Prospecting")
-    query = st.text_input("Enter a search query", value="top wealth management firms 2024")
+    prospecting_page.run_prospecting_page()
 
-# --- Location Tab ---
+# --- Placeholder Tab ---
 with tabs[2]:
     st.subheader("📍 Location-Based Query (Coming Soon)")
     st.info("This module will allow geographic filtering and search refinement by city or firm HQ.")

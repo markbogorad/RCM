@@ -1,4 +1,4 @@
-from utils.semantic_utils import embed_text, semantic_score
+from email_utils.semantic_utils import embed_text, semantic_score
 
 def score_candidates(email_contexts, reference_embeddings):
     results = []

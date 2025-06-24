@@ -44,10 +44,12 @@
     │ - Domain pattern hits   │
     └─────────────────────────┘
 
-- Database + agent for quick DDQ and Tracey market reports generation and navigation
 - Automated prospecting tool (project 4)
 
+
+
 ### Week 5
+- Database + agent for quick DDQ and Tracey market reports generation and navigation
 
 ### Week 6
 
