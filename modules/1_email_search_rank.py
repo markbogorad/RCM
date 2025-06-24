@@ -55,6 +55,7 @@ def run_email_rank_page():
     semantic scoring, and pattern generation. The more details you provide, the better the results.
     
     **Required fields:** First Name, Last Name, Company.
+    **Special characters must be excluded**
     """)
 
     with st.form("search_form"):

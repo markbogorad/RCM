@@ -11,7 +11,7 @@
 - Salesforce 6/18 clean (state fill, dupe check)
 
 ### Week 4
-- Email Semantic scoring
+- Email Semantic scoring (project 5)
 
                 ┌──────────────┐
                 │ User Inputs  │
@@ -45,6 +45,7 @@
     └─────────────────────────┘
 
 - Database + agent for quick DDQ and Tracey market reports generation and navigation
+- Automated prospecting tool (project 4)
 
 ### Week 5
 
