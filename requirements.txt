@@ -6,3 +6,7 @@ streamlit
 pandas
 sentence-transformers
 serpapi>=0.1.4
+plotly>=5.13.0
+scikit-learn
+lightgbm
+joblib
