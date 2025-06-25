@@ -20,7 +20,7 @@ st.markdown("<h1 style='text-align: center;'>🏛️ RAM Sales Research Toolkit<
 st.markdown("")
 
 # --- Top-level tabs ---
-tabs = st.tabs(["📧 Email Search", "📍 Prospecting", "🧭 Location Query (Soon)"])
+tabs = st.tabs(["📧 Email Search", "📍 Prospecting", "(Coming Soon)"])
 
 # --- Email Search Tab ---
 with tabs[0]:
@@ -32,5 +32,5 @@ with tabs[1]:
 
 # --- Placeholder Tab ---
 with tabs[2]:
-    st.subheader("📍 Location-Based Query (Coming Soon)")
-    st.info("This module will allow geographic filtering and search refinement by city or firm HQ.")
+    st.subheader("(Coming Soon)")
+    st.info("More tools coming soon.")
