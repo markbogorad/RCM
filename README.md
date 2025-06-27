@@ -12,10 +12,11 @@
 
 ### Week 4
 - Email Semantic scoring (project 5)
-- Dakota wider DB creation (including AUM & etc) for project 4
-- Agent for quick DDQ and Tracey market reports generation and navigation (RocketDocs integration?)
+- Agent for quick DDQ and Tracey market reports generation and navigation (project )
+- Documentation for 
 
 ### Week 5
+- Dakota wider DB creation (including AUM & etc) for project 4
 - Automated prospecting tool (project 4)
      - Lead scoring here
 
