@@ -13,12 +13,15 @@
 ### Week 4
 - Email Semantic scoring (project 5)
 - Agent for quick DDQ and Tracey market reports generation and navigation (project )
-- Documentation for 
+- Documentation for agent
 
 ### Week 5
 - Dakota wider DB creation (including AUM & etc) for project 4
 - Automated prospecting tool (project 4)
      - Lead scoring here
+     - 3 tier levels of clients
+     - Copiot agent for looking in inbox to cross check
+     - A layer of who was previously reached out to and who was mentioned
 
 ### Week 6
 - Quant project Jai and Nikhil
@@ -41,4 +44,12 @@
 
 ### Week 10
 - Presentation
+     - RAM pitch (2 mins)
+     - What I did with tech - story to sales pitch
+     - Sales process
+     - Where RAM differentiates itself and the final application
 - Do project 1 sometime here (sales pitch), maybe pitch high yeild muni
+
+### RAM Pitch
+- About RAM
+- RAMs equity research process
