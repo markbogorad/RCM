@@ -16,21 +16,26 @@
 - Documentation for agent
 
 ### Week 5
+- Dakota - salesforce clean revisited - 3 lists
 - Dakota wider DB creation (including AUM & etc) for project 4
-- Automated prospecting tool (project 4)
+- Automated prospecting tool (project 4) rough draft
      - Lead scoring here
      - 3 tier levels of clients
      - Copiot agent for looking in inbox to cross check
      - A layer of who was previously reached out to and who was mentioned
+     - RGFO penetration overlay
+     - Weave in agents for LLM level inference
 
 ### Week 6
+- Prospecting demos (Kevin)
+
+### Week 7
 - Quant project Jai and Nikhil
      - A study on minimizing tracking error for balance fund
      - Black-Litterman for including investor expectations
      - Factor models
      - Quant audits
 
-### Week 7
 - Fixed income project Alex and Brent?
 - Ideas: write a technical paper with a backtest on muni stuff
      - Case study on muni index vs t-bill spread
