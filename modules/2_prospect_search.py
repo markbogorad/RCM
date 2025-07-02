@@ -32,7 +32,7 @@ def run_prospecting_page():
     if not uploaded_file:
         st.stop()
 
-    df = pd.read_csv(uploaded_file)
+    df = pd.read_csv(uploaded_file, encoding='latin1')  # or 'ISO-8859-1', 'utf-16', etc.
     st.success(f"Loaded {len(df)} records.")
 
     # --- Auto-detect fields ---
