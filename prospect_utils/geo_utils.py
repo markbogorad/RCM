@@ -37,10 +37,37 @@ def enrich_with_coordinates(df):
             raise ValueError(f"Missing required address column: {col}")
 
     # Drop rows with empty parts
+    # Drop rows with missing required parts
     df = df.dropna(subset=required_address_cols)
+
+    # Remove problematic characters from address components
+    def clean_address_field(val):
+        if pd.isna(val):
+            return ""
+        val = str(val).encode("ascii", "ignore").decode("utf-8")  # remove non-ASCII
+        val = val.replace("\n", " ").replace("\r", " ")
+        val = val.replace("’", "'").replace("“", '"').replace("”", '"')
+        val = val.strip()
+        return val
+
+    for col in required_address_cols:
+        df[col] = df[col].apply(clean_address_field)
+
+    # Drop rows where any address part is still empty after cleaning
     df = df[
         df[required_address_cols].apply(lambda row: all(str(x).strip() for x in row), axis=1)
     ].copy()
+
+    # Final sanity check – remove addresses that are unusually short
+    df["Full_Address"] = (
+        df["Dakota Billing Street"] + ", " +
+        df["Dakota Billing City"] + ", " +
+        df["Dakota Billing State/Province"] + " " +
+        df["Dakota Billing Zip/Postal Code"]
+    )
+
+    df = df[df["Full_Address"].str.len() > 10]
+
 
     # Build full address string
     df["Full_Address"] = (
