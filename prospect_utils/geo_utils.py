@@ -19,65 +19,61 @@ def geocode_address(address):
     except:
         return (None, None)
 
+# --- Clean individual address fields ---
+def clean_address_field(val):
+    if pd.isna(val):
+        return ""
+    val = str(val).encode("ascii", "ignore").decode("utf-8")  # remove non-ASCII
+    val = val.replace("\n", " ").replace("\r", " ")
+    val = val.replace("’", "'").replace("“", '"').replace("”", '"')
+    val = val.strip()
+    return val
+
 # --- Enrich with lat/lon ---
 @st.cache_data(show_spinner=True)
 def enrich_with_coordinates(df):
-    # Filter to U.S. only
+    # Filter U.S. records
     df = df[df["Dakota Billing Country"].fillna("").str.upper() == "UNITED STATES"].copy()
 
-    # Required fields
-    required_address_cols = [
+    # Normalize column names to detect real headers
+    normalized_cols = {col.strip(): col for col in df.columns}
+    required_fields = [
         "Dakota Billing Street",
         "Dakota Billing City",
         "Dakota Billing State/Province",
         "Dakota Billing Zip/Postal Code"
     ]
-    for col in required_address_cols:
-        if col not in df.columns:
-            raise ValueError(f"Missing required address column: {col}")
+    missing = [col for col in required_fields if col not in normalized_cols]
+    if missing:
+        raise ValueError(f"Missing required address columns: {missing}\nAvailable columns: {list(df.columns)}")
 
-    # Drop rows with empty parts
-    # Drop rows with missing required parts
-    df = df.dropna(subset=required_address_cols)
+    # Map actual column names
+    street_col = normalized_cols["Dakota Billing Street"]
+    city_col = normalized_cols["Dakota Billing City"]
+    state_col = normalized_cols["Dakota Billing State/Province"]
+    zip_col = normalized_cols["Dakota Billing Zip/Postal Code"]
 
-    # Remove problematic characters from address components
-    def clean_address_field(val):
-        if pd.isna(val):
-            return ""
-        val = str(val).encode("ascii", "ignore").decode("utf-8")  # remove non-ASCII
-        val = val.replace("\n", " ").replace("\r", " ")
-        val = val.replace("’", "'").replace("“", '"').replace("”", '"')
-        val = val.strip()
-        return val
-
-    for col in required_address_cols:
+    # Sanitize fields
+    for col in [street_col, city_col, state_col, zip_col]:
         df[col] = df[col].apply(clean_address_field)
 
-    # Drop rows where any address part is still empty after cleaning
+    # Drop rows with any blank/invalid address parts
     df = df[
-        df[required_address_cols].apply(lambda row: all(str(x).strip() for x in row), axis=1)
+        df[[street_col, city_col, state_col, zip_col]].apply(
+            lambda row: all(str(x).strip() for x in row), axis=1
+        )
     ].copy()
 
-    # Final sanity check – remove addresses that are unusually short
+    # Compose clean Full Address
     df["Full_Address"] = (
-        df["Dakota Billing Street"] + ", " +
-        df["Dakota Billing City"] + ", " +
-        df["Dakota Billing State/Province"] + " " +
-        df["Dakota Billing Zip/Postal Code"]
+        df[street_col] + ", " +
+        df[city_col] + ", " +
+        df[state_col] + " " +
+        df[zip_col]
     )
-
     df = df[df["Full_Address"].str.len() > 10]
 
-
-    # Build full address string
-    df["Full_Address"] = (
-        df["Dakota Billing Street"].str.strip() + ", " +
-        df["Dakota Billing City"].str.strip() + ", " +
-        df["Dakota Billing State/Province"].str.strip() + " " +
-        df["Dakota Billing Zip/Postal Code"].astype(str).str.strip()
-    )
-
-    # Geocode
+    # Geocode using cached helper
     coords = df["Full_Address"].apply(geocode_address)
     df["Latitude"] = coords.apply(lambda x: x[0])
     df["Longitude"] = coords.apply(lambda x: x[1])
@@ -100,7 +96,7 @@ def plot_mapbox_scatter(df, color_feature=None):
     color_type = "categorical"
     color_map = None
 
-    if color_feature and color_feature in df.columns:
+    if color_feature in df.columns:
         col_values = df[color_feature].dropna().unique()
 
         if df[color_feature].dropna().isin(["Yes", "No", 1, 0]).all():
@@ -115,7 +111,7 @@ def plot_mapbox_scatter(df, color_feature=None):
         else:
             color_type = "categorical"
 
-    # Build plot
+    # Build Plot
     fig = px.scatter_mapbox(
         df,
         lat="Latitude",
