@@ -32,8 +32,20 @@ def clean_address_field(val):
 # --- Enrich with lat/lon ---
 @st.cache_data(show_spinner=True)
 def enrich_with_coordinates(df):
-    # Filter U.S. records
-    df = df[df["Dakota Billing Country"].fillna("").str.upper() == "UNITED STATES"].copy()
+    # Clean column names
+    df.columns = (
+        df.columns
+        .str.strip()
+        .str.replace('\xa0', ' ')
+        .str.replace(' +', ' ', regex=True)
+    )
+
+    # Print for debugging
+    print("Available columns:", df.columns.tolist())
+
+    # Filter to U.S. only
+    if "Dakota Billing Country" in df.columns:
+        df = df[df["Dakota Billing Country"].fillna("").str.upper() == "UNITED STATES"].copy()
 
     # Normalize column names to detect real headers
     normalized_cols = {col.strip(): col for col in df.columns}
@@ -43,37 +55,40 @@ def enrich_with_coordinates(df):
         "Dakota Billing State/Province",
         "Dakota Billing Zip/Postal Code"
     ]
-    missing = [col for col in required_fields if col not in normalized_cols]
+    missing = [col for col in required_address_cols if col not in df.columns]
     if missing:
-        raise ValueError(f"Missing required address columns: {missing}\nAvailable columns: {list(df.columns)}")
+        raise KeyError(f"Missing required address columns: {missing}")
 
-    # Map actual column names
-    street_col = normalized_cols["Dakota Billing Street"]
-    city_col = normalized_cols["Dakota Billing City"]
-    state_col = normalized_cols["Dakota Billing State/Province"]
-    zip_col = normalized_cols["Dakota Billing Zip/Postal Code"]
+    # Drop rows with missing required parts
+    df = df.dropna(subset=required_address_cols)
 
-    # Sanitize fields
-    for col in [street_col, city_col, state_col, zip_col]:
+    # Clean address fields
+    def clean_address_field(val):
+        if pd.isna(val):
+            return ""
+        val = str(val).encode("ascii", "ignore").decode("utf-8")  # remove non-ASCII
+        val = val.replace("\n", " ").replace("\r", " ")
+        val = val.replace("’", "'").replace("“", '"').replace("”", '"')
+        return val.strip()
+
+    for col in required_address_cols:
         df[col] = df[col].apply(clean_address_field)
 
-    # Drop rows with any blank/invalid address parts
-    df = df[
-        df[[street_col, city_col, state_col, zip_col]].apply(
-            lambda row: all(str(x).strip() for x in row), axis=1
-        )
-    ].copy()
+    # Drop rows where any address part is still empty after cleaning
+    df = df[df[required_address_cols].apply(lambda row: all(str(x).strip() for x in row), axis=1)].copy()
 
-    # Compose clean Full Address
+    # Build Full_Address
     df["Full_Address"] = (
-        df[street_col] + ", " +
-        df[city_col] + ", " +
-        df[state_col] + " " +
-        df[zip_col]
+        df["Dakota Billing Street"].str.strip() + ", " +
+        df["Dakota Billing City"].str.strip() + ", " +
+        df["Dakota Billing State/Province"].str.strip() + " " +
+        df["Dakota Billing Zip/Postal Code"].astype(str).str.strip()
     )
+
+    # Filter out short addresses
     df = df[df["Full_Address"].str.len() > 10]
 
-    # Geocode using cached helper
+    # Geocode
     coords = df["Full_Address"].apply(geocode_address)
     df["Latitude"] = coords.apply(lambda x: x[0])
     df["Longitude"] = coords.apply(lambda x: x[1])
