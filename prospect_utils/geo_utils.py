@@ -23,11 +23,10 @@ def geocode_address(address):
 def clean_address_field(val):
     if pd.isna(val):
         return ""
-    val = str(val).encode("ascii", "ignore").decode("utf-8")  # remove non-ASCII
+    val = str(val).encode("ascii", "ignore").decode("utf-8")
     val = val.replace("\n", " ").replace("\r", " ")
     val = val.replace("’", "'").replace("“", '"').replace("”", '"')
-    val = val.strip()
-    return val
+    return val.strip()
 
 # --- Enrich with lat/lon ---
 @st.cache_data(show_spinner=True)
@@ -47,37 +46,26 @@ def enrich_with_coordinates(df):
     if "Dakota Billing Country" in df.columns:
         df = df[df["Dakota Billing Country"].fillna("").str.upper() == "UNITED STATES"].copy()
 
-    # Normalize column names to detect real headers
-    normalized_cols = {col.strip(): col for col in df.columns}
+    # Required address fields
     required_fields = [
         "Dakota Billing Street",
         "Dakota Billing City",
         "Dakota Billing State/Province",
         "Dakota Billing Zip/Postal Code"
     ]
-    missing = [col for col in required_address_cols if col not in df.columns]
+
+    missing = [col for col in required_fields if col not in df.columns]
     if missing:
         raise KeyError(f"Missing required address columns: {missing}")
 
-    # Drop rows with missing required parts
-    df = df.dropna(subset=required_address_cols)
-
-    # Clean address fields
-    def clean_address_field(val):
-        if pd.isna(val):
-            return ""
-        val = str(val).encode("ascii", "ignore").decode("utf-8")  # remove non-ASCII
-        val = val.replace("\n", " ").replace("\r", " ")
-        val = val.replace("’", "'").replace("“", '"').replace("”", '"')
-        return val.strip()
-
-    for col in required_address_cols:
+    # Drop rows with missing parts
+    df = df.dropna(subset=required_fields)
+    for col in required_fields:
         df[col] = df[col].apply(clean_address_field)
 
-    # Drop rows where any address part is still empty after cleaning
-    df = df[df[required_address_cols].apply(lambda row: all(str(x).strip() for x in row), axis=1)].copy()
+    df = df[df[required_fields].apply(lambda row: all(str(x).strip() for x in row), axis=1)].copy()
 
-    # Build Full_Address
+    # Build full address
     df["Full_Address"] = (
         df["Dakota Billing Street"].str.strip() + ", " +
         df["Dakota Billing City"].str.strip() + ", " +
@@ -85,7 +73,7 @@ def enrich_with_coordinates(df):
         df["Dakota Billing Zip/Postal Code"].astype(str).str.strip()
     )
 
-    # Filter out short addresses
+    # Drop any remaining bad addresses
     df = df[df["Full_Address"].str.len() > 10]
 
     # Geocode
@@ -100,11 +88,9 @@ def enrich_with_coordinates(df):
 def plot_mapbox_scatter(df, color_feature=None):
     df = enrich_with_coordinates(df)
 
-    # Detect AUM & name column
     aum_col = next((c for c in df.columns if "Dakota AUM" in c), None)
     name_col = next((c for c in df.columns if "Account Name" in c and "Dakota" in c), "Provided Account Name")
 
-    # Determine color logic
     if not color_feature or color_feature not in df.columns:
         color_feature = "Dakota Contact Type" if "Dakota Contact Type" in df.columns else None
 
@@ -126,7 +112,7 @@ def plot_mapbox_scatter(df, color_feature=None):
         else:
             color_type = "categorical"
 
-    # Build Plot
+    # Plot
     fig = px.scatter_mapbox(
         df,
         lat="Latitude",
