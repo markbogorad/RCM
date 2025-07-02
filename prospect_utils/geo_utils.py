@@ -23,10 +23,19 @@ def geocode_address(address):
 @st.cache_data(show_spinner=True)
 def enrich_with_coordinates(df):
     # Clean column names
-    df.columns = df.columns.str.strip().str.replace('\xa0', ' ').str.replace(' +', ' ', regex=True)
+    df.columns = (
+        df.columns
+        .str.strip()
+        .str.replace('\xa0', ' ')
+        .str.replace(' +', ' ', regex=True)
+    )
+
+    # Print for debugging
+    print("Available columns:", df.columns.tolist())
 
     # Filter to U.S. only
-    df = df[df["Dakota Billing Country"].fillna("").str.upper() == "UNITED STATES"].copy()
+    if "Dakota Billing Country" in df.columns:
+        df = df[df["Dakota Billing Country"].fillna("").str.upper() == "UNITED STATES"].copy()
 
     # Required fields
     required_address_cols = [
@@ -37,7 +46,7 @@ def enrich_with_coordinates(df):
     ]
     missing = [col for col in required_address_cols if col not in df.columns]
     if missing:
-        raise ValueError(f"Missing required address columns: {missing}")
+        raise KeyError(f"Missing required address columns: {missing}")
 
     # Drop rows with missing required parts
     df = df.dropna(subset=required_address_cols)
