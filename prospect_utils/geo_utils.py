@@ -24,19 +24,31 @@ def geocode_address(address):
 def enrich_with_coordinates(df):
     us_df = df[df["Dakota Billing Country"].fillna("").str.upper() == "UNITED STATES"].copy()
 
-    address_cols = [
-        "Dakota Billing Street", "Dakota Billing City",
-        "Dakota Billing State/Province", "Dakota Billing Zip/Postal Code"
+    # --- Build consistent full address using reliable fields only ---
+    required_address_cols = [
+        "Dakota Billing Street",
+        "Dakota Billing City",
+        "Dakota Billing State/Province",
+        "Dakota Billing Zip/Postal Code"
     ]
-    valid_cols = [col for col in address_cols if col in us_df.columns]
-    us_df["Full_Address"] = us_df[valid_cols].fillna("").agg(", ".join, axis=1)
 
-    coords = us_df["Full_Address"].apply(geocode_address)
-    us_df["Latitude"] = coords.apply(lambda x: x[0])
-    us_df["Longitude"] = coords.apply(lambda x: x[1])
-    us_df = us_df.dropna(subset=["Latitude", "Longitude"])
+    for col in required_address_cols:
+        if col not in df.columns:
+            raise ValueError(f"Missing required address column: {col}")
 
-    return us_df
+        df["Full_Address"] = (
+        df["Dakota Billing Street"].fillna("") + ", " +
+        df["Dakota Billing City"].fillna("") + ", " +
+        df["Dakota Billing State/Province"].fillna("") + " " +
+        df["Dakota Billing Zip/Postal Code"].fillna("")
+    )
+
+        coords = us_df["Full_Address"].apply(geocode_address)
+        us_df["Latitude"] = coords.apply(lambda x: x[0])
+        us_df["Longitude"] = coords.apply(lambda x: x[1])
+        us_df = us_df.dropna(subset=["Latitude", "Longitude"])
+
+        return us_df
 
 # --- Main plotting function ---
 def plot_mapbox_scatter(df, color_feature=None):

@@ -81,7 +81,12 @@ def run_prospecting_page():
     ]
 
     # Optional overlay selection
-    color_col = st.selectbox("🎨 Optional Color Overlay:", options=["None"] + sorted(valid_color_features))
+    overlay_choice = st.radio(
+        "🎨 Optional Color Overlay:",
+        options=["None"] + sorted(valid_color_features),
+        horizontal=True
+    )
+    color_col = None if overlay_choice == "None" else overlay_choice
 
     if color_col == "None":
         color_col = None
