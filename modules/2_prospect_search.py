@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import io
 import joblib
 
@@ -14,20 +13,26 @@ def load_model():
     features = joblib.load("models/model_features.pkl")
     return model, features
 
+# --- Whitelisted fields for coloring ---
+YES_NO_COLUMNS = [
+    'Dakota Select Lists', 'Dakota OCIO Business', 'Dakota Models',
+    'Dakota Emerging Manager Program', 'Dakota Invests in Impact, SRI or ESG',
+    'Dakota Hedge FOF', 'Dakota Real Estate FOF', 'Dakota Private Equity FOF',
+    'Dakota Private Equity', 'Dakota Private Credit', 'Dakota Hedge Funds',
+    'Dakota Private Real Estate', 'Dakota Liquid Alternatives',
+    'Dakota Real Assets', 'Dakota Venture Capital'
+]
+
+ORDINAL_COLUMNS = {
+    "Dakota Mutual Fund Usage", "Dakota LP Usage", "Dakota Separate Account Usage",
+    "Dakota UMA Usage", "Dakota ETF Usage", "Dakota CIT Usage", "Dakota UCITS Usage"
+}
+
+NUMERIC_COLUMNS = ["Dakota AUM", "Score"]
+
 def run_prospecting_page():
     st.subheader("📍 Prospecting Map & Scoring Tool")
-    st.markdown("""
-    Upload a CSV of prospect data to:
 
-    - Visualize firms as points on a U.S. Mapbox map
-    - Score/rank them using:
-        - A rule-based model (unsupervised)
-        - A pre-trained tree model (supervised)
-
-    **Required fields:** Billing address columns (Street, City, State, Zip), `Dakota AUM`  
-    """)
-
-    # --- Upload data ---
     uploaded_file = st.file_uploader("📁 Upload Prospect Data (.csv)", type=["csv"])
     if not uploaded_file:
         st.stop()
@@ -35,17 +40,16 @@ def run_prospecting_page():
     df = pd.read_csv(uploaded_file, encoding='latin1')
     st.success(f"✅ Loaded {len(df)} records.")
 
-    # --- Auto-detect key columns ---
+    # --- Column detection ---
     aum_col = next((c for c in df.columns if "Dakota AUM" in c), None)
     state_col = next((c for c in df.columns if "State" in c and "Dakota" in c), None)
     company_col = next((c for c in df.columns if "Account Name" in c and "Dakota" in c), "Provided Account Name")
-    metro_col = next((c for c in df.columns if "Metro" in c), None)
 
     if not all([aum_col, state_col, company_col]):
         st.error("❌ Missing required fields: Dakota AUM, Dakota Billing State/Province, or Account Name.")
         st.stop()
 
-    # --- Scoring Model Selection ---
+    # --- Model choice ---
     model_type = st.radio("🧠 Choose scoring model", ["🔧 Rule-based", "🌲 Tree-based Model"])
 
     if model_type == "🔧 Rule-based":
@@ -56,26 +60,44 @@ def run_prospecting_page():
         if missing:
             st.error(f"❌ Missing required model features: {missing}")
             st.stop()
-
         X = df[model_features].copy()
         df["Score"] = model.predict_proba(X)[:, 1] if hasattr(model, "predict_proba") else model.predict(X)
 
-    # --- Preview Table ---
+    # --- Preview table ---
     df = df.sort_values("Score", ascending=False)
     display_cols = [company_col, state_col, aum_col, "Score"]
-    if metro_col:
-        display_cols.append(metro_col)
     st.dataframe(df[display_cols])
 
-    # --- Map Feature Selection ---
-    st.markdown("### 🗺️ Map Customization")
-    feature_options = [col for col in df.columns if df[col].nunique() > 1 and df[col].nunique() < 100]
-    color_feature = st.selectbox("🎨 Color code map by:", options=feature_options, index=0)
+    # --- MAP always renders ---
+    st.markdown("### 🗺️ Map Visualization")
 
-    # --- Map Rendering ---
-    st.plotly_chart(plot_mapbox_scatter(df, color_feature=color_feature), use_container_width=True)
+    # Filter columns that exist and are in our mapped categories
+    valid_color_features = [
+        col for col in df.columns if (
+            col in YES_NO_COLUMNS
+            or col in ORDINAL_COLUMNS
+            or col in NUMERIC_COLUMNS
+        )
+    ]
 
-    # --- Download Button ---
+    # Optional overlay selection
+    overlay_choice = st.radio(
+        "🎨 Optional Color Overlay:",
+        options=["None"] + sorted(valid_color_features),
+        horizontal=True
+    )
+    color_col = None if overlay_choice == "None" else overlay_choice
+
+    if color_col == "None":
+        color_col = None
+
+    try:
+        st.plotly_chart(plot_mapbox_scatter(df, color_feature=color_col), use_container_width=True)
+    except Exception as e:
+        st.warning(f"⚠️ Could not render color overlay: {e}")
+        st.plotly_chart(plot_mapbox_scatter(df), use_container_width=True)
+
+    # --- Download file ---
     buffer = io.BytesIO()
     df.to_csv(buffer, index=False)
     buffer.seek(0)

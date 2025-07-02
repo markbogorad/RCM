@@ -5,7 +5,7 @@ from rcm_secrets import MAPBOX_TOKEN
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 
-# Initialize Mapbox
+# Set Mapbox token once
 px.set_mapbox_access_token(MAPBOX_TOKEN)
 
 # --- Caching for geocoding ---
@@ -19,57 +19,103 @@ def geocode_address(address):
     except:
         return (None, None)
 
-# --- Address preprocessing + geocoding ---
+# --- Enrich with lat/lon ---
 @st.cache_data(show_spinner=True)
 def enrich_with_coordinates(df):
-    us_df = df[df["Dakota Billing Country"].fillna("").str.upper() == "UNITED STATES"].copy()
+    # Filter to U.S. only
+    df = df[df["Dakota Billing Country"].fillna("").str.upper() == "UNITED STATES"].copy()
 
-    address_cols = [
-        "Dakota Billing Street", "Dakota Billing City",
-        "Dakota Billing State/Province", "Dakota Billing Zip/Postal Code"
+    # Required fields
+    required_address_cols = [
+        "Dakota Billing Street",
+        "Dakota Billing City",
+        "Dakota Billing State/Province",
+        "Dakota Billing Zip/Postal Code"
     ]
-    valid_cols = [col for col in address_cols if col in us_df.columns]
-    us_df["Full_Address"] = us_df[valid_cols].fillna("").agg(", ".join, axis=1)
+    for col in required_address_cols:
+        if col not in df.columns:
+            raise ValueError(f"Missing required address column: {col}")
 
-    coords = us_df["Full_Address"].apply(geocode_address)
-    us_df["Latitude"] = coords.apply(lambda x: x[0])
-    us_df["Longitude"] = coords.apply(lambda x: x[1])
-    us_df = us_df.dropna(subset=["Latitude", "Longitude"])
+    # Drop rows with empty parts
+    # Drop rows with missing required parts
+    df = df.dropna(subset=required_address_cols)
 
-    return us_df
+    # Remove problematic characters from address components
+    def clean_address_field(val):
+        if pd.isna(val):
+            return ""
+        val = str(val).encode("ascii", "ignore").decode("utf-8")  # remove non-ASCII
+        val = val.replace("\n", " ").replace("\r", " ")
+        val = val.replace("’", "'").replace("“", '"').replace("”", '"')
+        val = val.strip()
+        return val
 
-# --- Main plotting function ---
+    for col in required_address_cols:
+        df[col] = df[col].apply(clean_address_field)
+
+    # Drop rows where any address part is still empty after cleaning
+    df = df[
+        df[required_address_cols].apply(lambda row: all(str(x).strip() for x in row), axis=1)
+    ].copy()
+
+    # Final sanity check – remove addresses that are unusually short
+    df["Full_Address"] = (
+        df["Dakota Billing Street"] + ", " +
+        df["Dakota Billing City"] + ", " +
+        df["Dakota Billing State/Province"] + " " +
+        df["Dakota Billing Zip/Postal Code"]
+    )
+
+    df = df[df["Full_Address"].str.len() > 10]
+
+
+    # Build full address string
+    df["Full_Address"] = (
+        df["Dakota Billing Street"].str.strip() + ", " +
+        df["Dakota Billing City"].str.strip() + ", " +
+        df["Dakota Billing State/Province"].str.strip() + " " +
+        df["Dakota Billing Zip/Postal Code"].astype(str).str.strip()
+    )
+
+    # Geocode
+    coords = df["Full_Address"].apply(geocode_address)
+    df["Latitude"] = coords.apply(lambda x: x[0])
+    df["Longitude"] = coords.apply(lambda x: x[1])
+    df = df.dropna(subset=["Latitude", "Longitude"])
+
+    return df
+
+# --- Main Mapbox scatter plot function ---
 def plot_mapbox_scatter(df, color_feature=None):
     df = enrich_with_coordinates(df)
 
-    # --- Detect label columns ---
+    # Detect AUM & name column
     aum_col = next((c for c in df.columns if "Dakota AUM" in c), None)
     name_col = next((c for c in df.columns if "Account Name" in c and "Dakota" in c), "Provided Account Name")
 
-    # --- Determine color type ---
+    # Determine color logic
     if not color_feature or color_feature not in df.columns:
         color_feature = "Dakota Contact Type" if "Dakota Contact Type" in df.columns else None
 
     color_type = "categorical"
-    if color_feature in df.columns:
-        unique_vals = df[color_feature].dropna().unique()
+    color_map = None
+
+    if color_feature and color_feature in df.columns:
+        col_values = df[color_feature].dropna().unique()
+
         if df[color_feature].dropna().isin(["Yes", "No", 1, 0]).all():
             color_type = "yesno"
             df[color_feature] = df[color_feature].replace({"Yes": 1, "No": 0})
             color_map = {0: "red", 1: "green"}
-        elif df[color_feature].nunique() <= 4 and set(unique_vals).issubset({"Zero", "Small", "Medium", "Large"}):
+        elif df[color_feature].nunique() <= 4 and set(col_values).issubset({"Zero", "Small", "Medium", "Large"}):
             color_type = "ordinal"
             color_map = {"Zero": "lightgray", "Small": "red", "Medium": "orange", "Large": "green"}
         elif pd.api.types.is_numeric_dtype(df[color_feature]):
             color_type = "numeric"
-            color_map = None
         else:
-            color_map = None
-    else:
-        color_type = None
-        color_map = None
+            color_type = "categorical"
 
-    # --- Build plot ---
+    # Build plot
     fig = px.scatter_mapbox(
         df,
         lat="Latitude",
