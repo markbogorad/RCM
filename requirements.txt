@@ -10,3 +10,4 @@ plotly>=5.13.0
 scikit-learn
 lightgbm
 joblib
+geopy>=2.4.0
