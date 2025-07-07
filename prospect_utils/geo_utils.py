@@ -5,8 +5,10 @@ from rcm_secrets import MAPBOX_TOKEN
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 
+# Set Mapbox token once
 px.set_mapbox_access_token(MAPBOX_TOKEN)
 
+# --- Caching for geocoding ---
 @st.cache_data(show_spinner=False)
 def geocode_address(address):
     geolocator = Nominatim(user_agent="rcm_mapbox")
@@ -17,6 +19,7 @@ def geocode_address(address):
     except:
         return (None, None)
 
+# --- Clean address fields ---
 def clean_address_field(val):
     if pd.isna(val):
         return ""
@@ -25,9 +28,10 @@ def clean_address_field(val):
     val = val.replace("’", "'").replace("“", '"').replace("”", '"')
     return val.strip()
 
+# --- Geocode enrich function ---
 @st.cache_data(show_spinner=True)
 def enrich_with_coordinates(df):
-    # Clean column names
+    # Normalize column names
     df.columns = (
         df.columns
         .str.strip()
@@ -35,7 +39,7 @@ def enrich_with_coordinates(df):
         .str.replace(" +", " ", regex=True)
     )
 
-    # Map cleaned names to actual names
+    # Map cleaned names to actual column names
     normalized_map = {col.strip().replace("\xa0", " ").replace("  ", " "): col for col in df.columns}
 
     required = [
@@ -45,11 +49,12 @@ def enrich_with_coordinates(df):
         "Dakota Billing Zip/Postal Code"
     ]
 
+    # Ensure required columns exist
     missing = [col for col in required if col not in normalized_map]
     if missing:
         raise KeyError(f"Missing required address columns: {missing}\nAvailable columns: {list(df.columns)}")
 
-    # Map to real internal names
+    # Use real column names
     street_col = normalized_map["Dakota Billing Street"]
     city_col = normalized_map["Dakota Billing City"]
     state_col = normalized_map["Dakota Billing State/Province"]
@@ -67,7 +72,7 @@ def enrich_with_coordinates(df):
         df[[street_col, city_col, state_col, zip_col]].apply(lambda row: all(str(x).strip() for x in row), axis=1)
     ].copy()
 
-    # Build Full_Address using real column names
+    # Build full address
     df["Full_Address"] = (
         df[street_col] + ", " +
         df[city_col] + ", " +
@@ -76,6 +81,7 @@ def enrich_with_coordinates(df):
     )
     df = df[df["Full_Address"].str.len() > 10]
 
+    # Geocode
     coords = df["Full_Address"].apply(geocode_address)
     df["Latitude"] = coords.apply(lambda x: x[0])
     df["Longitude"] = coords.apply(lambda x: x[1])
@@ -83,6 +89,7 @@ def enrich_with_coordinates(df):
 
     return df
 
+# --- Main Mapbox scatter plot function ---
 def plot_mapbox_scatter(df, color_feature=None):
     df = enrich_with_coordinates(df)
 
@@ -110,6 +117,7 @@ def plot_mapbox_scatter(df, color_feature=None):
         else:
             color_type = "categorical"
 
+    # Plot
     fig = px.scatter_mapbox(
         df,
         lat="Latitude",

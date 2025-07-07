@@ -28,6 +28,8 @@
 
 ### Week 6
 - Prospecting demos (Kevin)
+- Prospecting tool demo this week
+- Muni research ideas + rough draft
 
 ### Week 7
 - Quant project Jai and Nikhil
