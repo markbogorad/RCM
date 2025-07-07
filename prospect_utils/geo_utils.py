@@ -6,9 +6,10 @@ from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 import difflib
 
-# Set Mapbox token once
+# Set Mapbox token
 px.set_mapbox_access_token(MAPBOX_TOKEN)
 
+# --- Geocoding ---
 @st.cache_data(show_spinner=False)
 def geocode_address(address):
     geolocator = Nominatim(user_agent="rcm_mapbox")
@@ -19,6 +20,7 @@ def geocode_address(address):
     except:
         return (None, None)
 
+# --- Clean address fields ---
 def clean_address_field(val):
     if pd.isna(val):
         return ""
@@ -27,9 +29,10 @@ def clean_address_field(val):
     val = val.replace("’", "'").replace("“", '"').replace("”", '"')
     return val.strip()
 
+# --- Coordinate enrichment ---
 @st.cache_data(show_spinner=True)
 def enrich_with_coordinates(df):
-    # Step 1: Normalize columns
+    # Normalize column names
     df.columns = (
         df.columns
         .str.strip()
@@ -37,7 +40,7 @@ def enrich_with_coordinates(df):
         .str.replace(" +", " ", regex=True)
     )
 
-    # Step 2: Match address fields with fuzzy fallback
+    # Fuzzy match required fields
     required_fields = {
         "Dakota Billing Street": None,
         "Dakota Billing City": None,
@@ -58,20 +61,21 @@ def enrich_with_coordinates(df):
     state_col = required_fields["Dakota Billing State/Province"]
     zip_col = required_fields["Dakota Billing Zip/Postal Code"]
 
-    # Step 3: Filter U.S.-only
+    # Filter to U.S. only
     country_col = next((c for c in df.columns if "Country" in c), None)
     if country_col:
         df = df[df[country_col].fillna("").str.upper() == "UNITED STATES"].copy()
 
-    # Step 4: Clean and drop incomplete rows
+    # Clean and validate address fields
     df = df.dropna(subset=[street_col, city_col, state_col, zip_col])
     for col in [street_col, city_col, state_col, zip_col]:
         df[col] = df[col].apply(clean_address_field)
+
     df = df[
         df[[street_col, city_col, state_col, zip_col]].apply(lambda row: all(str(x).strip() for x in row), axis=1)
     ].copy()
 
-    # Step 5: Build address safely
+    # Construct full address
     try:
         df["Full_Address"] = (
             df[street_col] + ", " +
@@ -85,7 +89,7 @@ def enrich_with_coordinates(df):
 
     df = df[df["Full_Address"].str.len() > 10]
 
-    # Step 6: Geocode
+    # Geocode
     coords = df["Full_Address"].apply(geocode_address)
     df["Latitude"] = coords.apply(lambda x: x[0])
     df["Longitude"] = coords.apply(lambda x: x[1])
@@ -93,15 +97,18 @@ def enrich_with_coordinates(df):
 
     return df
 
+# --- Map rendering ---
 def plot_mapbox_scatter(df, color_feature=None):
     df = enrich_with_coordinates(df)
     if df.empty:
         st.warning("⚠️ Map could not be generated: no valid geocoded data.")
         return None
 
+    # Basic columns
     aum_col = next((c for c in df.columns if "Dakota AUM" in c), None)
     name_col = next((c for c in df.columns if "Account Name" in c and "Dakota" in c), "Provided Account Name")
 
+    # Color overlay logic
     if not color_feature or color_feature not in df.columns:
         color_feature = "Dakota Contact Type" if "Dakota Contact Type" in df.columns else None
 
@@ -123,6 +130,15 @@ def plot_mapbox_scatter(df, color_feature=None):
         else:
             color_type = "categorical"
 
+    # --- Size handling ---
+    size_col = "Score" if "Score" in df.columns else aum_col
+    if size_col and size_col in df.columns:
+        df[size_col] = pd.to_numeric(df[size_col], errors="coerce")
+        df = df[df[size_col] > 0].copy()
+    else:
+        size_col = None
+
+    # Plot
     fig = px.scatter_mapbox(
         df,
         lat="Latitude",
@@ -130,7 +146,7 @@ def plot_mapbox_scatter(df, color_feature=None):
         color=color_feature if color_type else None,
         color_discrete_map=color_map if color_type in ["yesno", "ordinal", "categorical"] else None,
         color_continuous_scale="Viridis" if color_type == "numeric" else None,
-        size="Score" if "Score" in df.columns else aum_col,
+        size=size_col,
         size_max=18,
         zoom=3,
         hover_name=name_col,
