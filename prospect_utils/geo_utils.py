@@ -4,6 +4,7 @@ import streamlit as st
 from rcm_secrets import MAPBOX_TOKEN
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
+import difflib
 
 # Set Mapbox token once
 px.set_mapbox_access_token(MAPBOX_TOKEN)
@@ -28,7 +29,7 @@ def clean_address_field(val):
 
 @st.cache_data(show_spinner=True)
 def enrich_with_coordinates(df):
-    # Step 1: Normalize column names
+    # Step 1: Normalize columns
     df.columns = (
         df.columns
         .str.strip()
@@ -36,49 +37,55 @@ def enrich_with_coordinates(df):
         .str.replace(" +", " ", regex=True)
     )
 
-    # Step 2: Map cleaned names to actual names
-    normalized_map = {col.strip().replace("\xa0", " ").replace("  ", " "): col for col in df.columns}
+    # Step 2: Match address fields with fuzzy fallback
+    required_fields = {
+        "Dakota Billing Street": None,
+        "Dakota Billing City": None,
+        "Dakota Billing State/Province": None,
+        "Dakota Billing Zip/Postal Code": None
+    }
 
-    required = [
-        "Dakota Billing Street",
-        "Dakota Billing City",
-        "Dakota Billing State/Province",
-        "Dakota Billing Zip/Postal Code"
-    ]
+    for key in required_fields:
+        match = difflib.get_close_matches(key, df.columns, n=1, cutoff=0.8)
+        if match:
+            required_fields[key] = match[0]
+        else:
+            st.warning(f"⚠️ Missing required column: {key}")
+            return pd.DataFrame()
 
-    missing = [col for col in required if col not in normalized_map]
-    if missing:
-        raise KeyError(f"Missing required address columns: {missing}\nAvailable columns: {list(df.columns)}")
+    street_col = required_fields["Dakota Billing Street"]
+    city_col = required_fields["Dakota Billing City"]
+    state_col = required_fields["Dakota Billing State/Province"]
+    zip_col = required_fields["Dakota Billing Zip/Postal Code"]
 
-    # Step 3: Extract actual DataFrame column names from the map
-    street_col = normalized_map["Dakota Billing Street"]
-    city_col = normalized_map["Dakota Billing City"]
-    state_col = normalized_map["Dakota Billing State/Province"]
-    zip_col = normalized_map["Dakota Billing Zip/Postal Code"]
+    # Step 3: Filter U.S.-only
+    country_col = next((c for c in df.columns if "Country" in c), None)
+    if country_col:
+        df = df[df[country_col].fillna("").str.upper() == "UNITED STATES"].copy()
 
-    # Step 4: U.S.-only filter
-    if "Dakota Billing Country" in df.columns:
-        df = df[df["Dakota Billing Country"].fillna("").str.upper() == "UNITED STATES"].copy()
-
-    # Step 5: Drop incomplete rows and clean text
+    # Step 4: Clean and drop incomplete rows
     df = df.dropna(subset=[street_col, city_col, state_col, zip_col])
     for col in [street_col, city_col, state_col, zip_col]:
         df[col] = df[col].apply(clean_address_field)
-
     df = df[
         df[[street_col, city_col, state_col, zip_col]].apply(lambda row: all(str(x).strip() for x in row), axis=1)
     ].copy()
 
-    # Step 6: Build full address safely
-    df["Full_Address"] = (
-        df[street_col] + ", " +
-        df[city_col] + ", " +
-        df[state_col] + " " +
-        df[zip_col].astype(str)
-    )
+    # Step 5: Build address safely
+    try:
+        df["Full_Address"] = (
+            df[street_col] + ", " +
+            df[city_col] + ", " +
+            df[state_col] + " " +
+            df[zip_col].astype(str)
+        )
+    except Exception as e:
+        st.warning(f"⚠️ Address formatting failed: {e}")
+        return pd.DataFrame()
+
     df = df[df["Full_Address"].str.len() > 10]
 
-    # Step 7: Geocode
+    # Step 6: Geocode
     coords = df["Full_Address"].apply(geocode_address)
     df["Latitude"] = coords.apply(lambda x: x[0])
     df["Longitude"] = coords.apply(lambda x: x[1])
@@ -88,6 +95,9 @@ def enrich_with_coordinates(df):
 
 def plot_mapbox_scatter(df, color_feature=None):
     df = enrich_with_coordinates(df)
+    if df.empty:
+        st.warning("⚠️ Map could not be generated: no valid geocoded data.")
+        return None
 
     aum_col = next((c for c in df.columns if "Dakota AUM" in c), None)
     name_col = next((c for c in df.columns if "Account Name" in c and "Dakota" in c), "Provided Account Name")
