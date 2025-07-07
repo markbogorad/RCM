@@ -6,29 +6,24 @@ import joblib
 from prospect_utils.geo_utils import plot_mapbox_scatter
 from prospect_utils.score_utils import rule_based_score
 
-# --- Load model + feature list ---
 @st.cache_resource
 def load_model():
     model = joblib.load("models/prospect_model.pkl")
     features = joblib.load("models/model_features.pkl")
     return model, features
 
-# --- Whitelisted fields for coloring ---
-YES_NO_COLUMNS = [
-    'Dakota Select Lists', 'Dakota OCIO Business', 'Dakota Models',
-    'Dakota Emerging Manager Program', 'Dakota Invests in Impact, SRI or ESG',
-    'Dakota Hedge FOF', 'Dakota Real Estate FOF', 'Dakota Private Equity FOF',
-    'Dakota Private Equity', 'Dakota Private Credit', 'Dakota Hedge Funds',
-    'Dakota Private Real Estate', 'Dakota Liquid Alternatives',
-    'Dakota Real Assets', 'Dakota Venture Capital'
+# --- Whitelisted overlay fields for strategic filtering ---
+AUM_ORDER_COL = "AUM Order"
+
+FUND_USAGE_OPTIONS = [
+    "Dakota Hedge Funds", "Dakota Private Credit", "Dakota Private Equity",
+    "Dakota Private Real Estate", "Dakota Real Assets", "Dakota Venture Capital"
 ]
 
-ORDINAL_COLUMNS = {
-    "Dakota Mutual Fund Usage", "Dakota LP Usage", "Dakota Separate Account Usage",
-    "Dakota UMA Usage", "Dakota ETF Usage", "Dakota CIT Usage", "Dakota UCITS Usage"
-}
-
-NUMERIC_COLUMNS = ["Dakota AUM", "Score"]
+INVESTMENT_TAGS = [
+    "Dakota Invests in Impact, SRI or ESG",
+    "Dakota Select Lists", "Dakota OCIO Business", "Dakota Models"
+]
 
 def run_prospecting_page():
     st.subheader("📍 Prospecting Map & Scoring Tool")
@@ -40,7 +35,7 @@ def run_prospecting_page():
     df = pd.read_csv(uploaded_file, encoding='latin1')
     st.success(f"✅ Loaded {len(df)} records.")
 
-    # --- Column detection ---
+    # --- Column checks ---
     aum_col = next((c for c in df.columns if "Dakota AUM" in c), None)
     state_col = next((c for c in df.columns if "State" in c and "Dakota" in c), None)
     company_col = next((c for c in df.columns if "Account Name" in c and "Dakota" in c), "Provided Account Name")
@@ -49,7 +44,7 @@ def run_prospecting_page():
         st.error("❌ Missing required fields: Dakota AUM, Dakota Billing State/Province, or Account Name.")
         st.stop()
 
-    # --- Model scoring ---
+    # --- Scoring ---
     model_type = st.radio("🧠 Choose scoring model", ["🔧 Rule-based", "🌲 Tree-based Model"])
 
     if model_type == "🔧 Rule-based":
@@ -63,27 +58,45 @@ def run_prospecting_page():
         X = df[model_features].copy()
         df["Score"] = model.predict_proba(X)[:, 1] if hasattr(model, "predict_proba") else model.predict(X)
 
-    # --- MAP RENDERING ---
-    st.markdown("### 🗺️ Map Visualization")
+    # --- Attribute filtering & coloring ---
+    st.markdown("### 🎯 Filter & Color by Strategy")
 
-    valid_color_features = [
-        col for col in df.columns if (
-            col in YES_NO_COLUMNS or
-            col in ORDINAL_COLUMNS or
-            col in NUMERIC_COLUMNS
-        )
-    ]
+    aum_order = None
+    fund_usage = None
+    invests_in = None
+    overlay_field = None
 
-    selected_overlay = st.selectbox("🎨 Color Bubbles By:", ["None"] + sorted(valid_color_features))
-    color_feature = selected_overlay if selected_overlay != "None" else None
+    with st.expander("Filter by:", expanded=True):
+        if AUM_ORDER_COL in df.columns:
+            aum_order = st.selectbox("• AUM Order", options=[""] + sorted(df[AUM_ORDER_COL].dropna().unique().tolist()))
 
+        available_funds = [col for col in FUND_USAGE_OPTIONS if col in df.columns]
+        if available_funds:
+            fund_usage = st.selectbox("• Fund Usage", options=[""] + available_funds)
+
+        available_invests = [col for col in INVESTMENT_TAGS if col in df.columns]
+        if available_invests:
+            invests_in = st.selectbox("• Invests In", options=[""] + available_invests)
+
+    # --- Color overlay determined by user filter ---
+    overlay_field = fund_usage or invests_in or None
+
+    # --- Plot map ---
     try:
-        st.plotly_chart(plot_mapbox_scatter(df, color_feature=color_feature), use_container_width=True)
+        st.plotly_chart(
+            plot_mapbox_scatter(
+                df,
+                color_feature=overlay_field,
+                aum_filter=aum_order,
+                fund_filter=fund_usage,
+                invest_filter=invests_in
+            ),
+            use_container_width=True
+        )
     except Exception as e:
-        st.warning(f"⚠️ Could not render color overlay: {e}")
-        st.plotly_chart(plot_mapbox_scatter(df), use_container_width=True)
+        st.warning(f"⚠️ Could not render map: {e}")
 
-    # --- Download scored file ---
+    # --- Download scored results ---
     buffer = io.BytesIO()
     df.to_csv(buffer, index=False)
     buffer.seek(0)
