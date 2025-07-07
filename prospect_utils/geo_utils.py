@@ -1,14 +1,12 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-import unicodedata
 from rcm_secrets import MAPBOX_TOKEN
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 
 px.set_mapbox_access_token(MAPBOX_TOKEN)
 
-# --- Caching for geocoding ---
 @st.cache_data(show_spinner=False)
 def geocode_address(address):
     geolocator = Nominatim(user_agent="rcm_mapbox")
@@ -19,77 +17,65 @@ def geocode_address(address):
     except:
         return (None, None)
 
-# --- Clean any address field ---
 def clean_address_field(val):
     if pd.isna(val):
         return ""
-    val = str(val)
-    val = unicodedata.normalize("NFKC", val)
-    val = val.encode("ascii", "ignore").decode("utf-8")
+    val = str(val).encode("ascii", "ignore").decode("utf-8")
     val = val.replace("\n", " ").replace("\r", " ")
     val = val.replace("’", "'").replace("“", '"').replace("”", '"')
     return val.strip()
 
-# --- Normalize column header ---
-def normalize_col(col):
-    col = str(col)
-    col = unicodedata.normalize("NFKC", col)
-    col = col.encode("ascii", "ignore").decode("utf-8")
-    col = col.replace("\xa0", " ").replace("\u200b", "")
-    return col.strip()
-
-# --- Match real dataset columns to expected field names ---
-def get_column_mapping(df, expected_fields):
-    cleaned_cols = {normalize_col(col): col for col in df.columns}
-    mapping = {}
-    for field in expected_fields:
-        norm = normalize_col(field)
-        match = cleaned_cols.get(norm)
-        if not match:
-            st.error(f"❌ Missing required column: `{field}`\n\nFound: {list(cleaned_cols.keys())}")
-            raise KeyError(f"Missing required column: {field}")
-        mapping[field] = match
-    return mapping
-
-# --- Enrich DataFrame with lat/lon coordinates ---
 @st.cache_data(show_spinner=True)
 def enrich_with_coordinates(df):
-    if "Dakota Billing Country" in df.columns:
-        df = df[df["Dakota Billing Country"].fillna("").str.upper() == "UNITED STATES"].copy()
+    # Clean column names
+    df.columns = (
+        df.columns
+        .str.strip()
+        .str.replace("\xa0", " ")
+        .str.replace(" +", " ", regex=True)
+    )
 
-    expected_fields = [
+    # Map cleaned names to actual names
+    normalized_map = {col.strip().replace("\xa0", " ").replace("  ", " "): col for col in df.columns}
+
+    required = [
         "Dakota Billing Street",
         "Dakota Billing City",
         "Dakota Billing State/Province",
         "Dakota Billing Zip/Postal Code"
     ]
 
-    col_map = get_column_mapping(df, expected_fields)
-    street_col = col_map["Dakota Billing Street"]
-    city_col = col_map["Dakota Billing City"]
-    state_col = col_map["Dakota Billing State/Province"]
-    zip_col = col_map["Dakota Billing Zip/Postal Code"]
+    missing = [col for col in required if col not in normalized_map]
+    if missing:
+        raise KeyError(f"Missing required address columns: {missing}\nAvailable columns: {list(df.columns)}")
 
-    # Clean each address component
+    # Map to real internal names
+    street_col = normalized_map["Dakota Billing Street"]
+    city_col = normalized_map["Dakota Billing City"]
+    state_col = normalized_map["Dakota Billing State/Province"]
+    zip_col = normalized_map["Dakota Billing Zip/Postal Code"]
+
+    # U.S. only
+    if "Dakota Billing Country" in df.columns:
+        df = df[df["Dakota Billing Country"].fillna("").str.upper() == "UNITED STATES"].copy()
+
+    # Drop incomplete rows
+    df = df.dropna(subset=[street_col, city_col, state_col, zip_col])
     for col in [street_col, city_col, state_col, zip_col]:
         df[col] = df[col].apply(clean_address_field)
+    df = df[
+        df[[street_col, city_col, state_col, zip_col]].apply(lambda row: all(str(x).strip() for x in row), axis=1)
+    ].copy()
 
-    # Drop rows with any blank address component
-    df = df.dropna(subset=[street_col, city_col, state_col, zip_col])
-    df = df[df[[street_col, city_col, state_col, zip_col]].apply(lambda row: all(str(x).strip() for x in row), axis=1)].copy()
-
-    # Build Full Address
+    # Build Full_Address using real column names
     df["Full_Address"] = (
         df[street_col] + ", " +
         df[city_col] + ", " +
         df[state_col] + " " +
         df[zip_col].astype(str)
     )
-
     df = df[df["Full_Address"].str.len() > 10]
-    st.write("📍 Sample addresses:", df["Full_Address"].sample(min(5, len(df))).tolist())
 
-    # Geocode
     coords = df["Full_Address"].apply(geocode_address)
     df["Latitude"] = coords.apply(lambda x: x[0])
     df["Longitude"] = coords.apply(lambda x: x[1])
@@ -97,7 +83,6 @@ def enrich_with_coordinates(df):
 
     return df
 
-# --- Main Mapbox Plot ---
 def plot_mapbox_scatter(df, color_feature=None):
     df = enrich_with_coordinates(df)
 
@@ -111,17 +96,19 @@ def plot_mapbox_scatter(df, color_feature=None):
     color_map = None
 
     if color_feature in df.columns:
-        values = df[color_feature].dropna().unique()
+        col_values = df[color_feature].dropna().unique()
 
         if df[color_feature].dropna().isin(["Yes", "No", 1, 0]).all():
             color_type = "yesno"
             df[color_feature] = df[color_feature].replace({"Yes": 1, "No": 0})
             color_map = {0: "red", 1: "green"}
-        elif df[color_feature].nunique() <= 4 and set(values).issubset({"Zero", "Small", "Medium", "Large"}):
+        elif df[color_feature].nunique() <= 4 and set(col_values).issubset({"Zero", "Small", "Medium", "Large"}):
             color_type = "ordinal"
             color_map = {"Zero": "lightgray", "Small": "red", "Medium": "orange", "Large": "green"}
         elif pd.api.types.is_numeric_dtype(df[color_feature]):
             color_type = "numeric"
+        else:
+            color_type = "categorical"
 
     fig = px.scatter_mapbox(
         df,
