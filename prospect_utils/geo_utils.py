@@ -6,8 +6,10 @@ from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 import difflib
 
+# Set Mapbox token
 px.set_mapbox_access_token(MAPBOX_TOKEN)
 
+# --- Geocoding ---
 @st.cache_data(show_spinner=False)
 def geocode_address(address):
     geolocator = Nominatim(user_agent="rcm_mapbox")
@@ -18,6 +20,7 @@ def geocode_address(address):
     except:
         return (None, None)
 
+# --- Clean address fields ---
 def clean_address_field(val):
     if pd.isna(val):
         return ""
@@ -26,6 +29,7 @@ def clean_address_field(val):
     val = val.replace("’", "'").replace("“", '"').replace("”", '"')
     return val.strip()
 
+# --- Coordinate enrichment ---
 @st.cache_data(show_spinner=True)
 def enrich_with_coordinates(df):
     df.columns = (
@@ -87,13 +91,15 @@ def enrich_with_coordinates(df):
 
     return df
 
+# --- Map rendering ---
 def plot_mapbox_scatter(df, color_feature=None, state_filter=None, aum_filter=None, fund_filter=None, invest_filter=None):
     df = enrich_with_coordinates(df)
     if df.empty:
         st.warning("⚠️ Map could not be generated: no valid geocoded data.")
         return None
 
-    if state_filter:
+    # Apply filters
+    if state_filter and "Dakota Billing State/Province" in df.columns:
         df = df[df["Dakota Billing State/Province"] == state_filter]
 
     if aum_filter and "AUM Order" in df.columns:
@@ -109,6 +115,7 @@ def plot_mapbox_scatter(df, color_feature=None, state_filter=None, aum_filter=No
         st.warning("⚠️ No matching prospects for selected filters.")
         return None
 
+    # Set columns
     aum_col = next((c for c in df.columns if "Dakota AUM" in c), None)
     name_col = next((c for c in df.columns if "Account Name" in c and "Dakota" in c), "Provided Account Name")
 
@@ -120,7 +127,6 @@ def plot_mapbox_scatter(df, color_feature=None, state_filter=None, aum_filter=No
 
     if color_feature in df.columns:
         col_values = df[color_feature].dropna().unique()
-
         if df[color_feature].dropna().isin(["Yes", "No", 1, 0]).all():
             color_type = "yesno"
             df[color_feature] = df[color_feature].replace({"Yes": 1, "No": 0})
@@ -130,9 +136,8 @@ def plot_mapbox_scatter(df, color_feature=None, state_filter=None, aum_filter=No
             color_map = {"Zero": "lightgray", "Small": "red", "Medium": "orange", "Large": "green"}
         elif pd.api.types.is_numeric_dtype(df[color_feature]):
             color_type = "numeric"
-        else:
-            color_type = "categorical"
 
+    # Size column
     size_col = "Score" if "Score" in df.columns else aum_col
     if size_col and size_col in df.columns:
         df[size_col] = pd.to_numeric(df[size_col], errors="coerce")
@@ -140,6 +145,7 @@ def plot_mapbox_scatter(df, color_feature=None, state_filter=None, aum_filter=No
     else:
         size_col = None
 
+    # Plot
     fig = px.scatter_mapbox(
         df,
         lat="Latitude",
@@ -152,8 +158,13 @@ def plot_mapbox_scatter(df, color_feature=None, state_filter=None, aum_filter=No
         hover_name=name_col,
         hover_data=["Full_Address", aum_col, color_feature] if color_feature else ["Full_Address", aum_col],
         zoom=3,
-        center={"lat": 37.0902, "lon": -95.7129},
+        center={"lat": 37.0902, "lon": -95.7129},  # Center on U.S.
         title=f"U.S. Prospects by {color_feature or 'Location'}"
     )
-    fig.update_layout(mapbox_style="outdoors", margin=dict(l=0, r=0, t=30, b=0))
+
+    fig.update_layout(
+        mapbox_style="outdoors",
+        margin=dict(l=0, r=0, t=30, b=0)
+    )
+
     return fig

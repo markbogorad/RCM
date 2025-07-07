@@ -24,7 +24,7 @@ st.markdown("<h1 style='text-align: center;'>🏛️ RAM Sales Research Toolkit<
 st.markdown("")
 
 # --- Top-Level Tabs ---
-tabs = st.tabs(["📧 Email Search", "📍 Prospecting", "(Coming Soon)"])
+tabs = st.tabs(["📧 Email Search", "📍 Prospecting", "AI Outreach (Coming Soon)"])
 
 with tabs[0]:
     email_search_page.run_email_rank_page()
@@ -33,5 +33,5 @@ with tabs[1]:
     prospecting_page.run_prospecting_page()
 
 with tabs[2]:
-    st.subheader("(Coming Soon)")
+    st.subheader("AI Outreach (Coming Soon)")
     st.info("More tools coming soon.")
