@@ -49,7 +49,7 @@ def run_prospecting_page():
         st.error("❌ Missing required fields: Dakota AUM, Dakota Billing State/Province, or Account Name.")
         st.stop()
 
-    # --- Model choice ---
+    # --- Model scoring ---
     model_type = st.radio("🧠 Choose scoring model", ["🔧 Rule-based", "🌲 Tree-based Model"])
 
     if model_type == "🔧 Rule-based":
@@ -63,41 +63,27 @@ def run_prospecting_page():
         X = df[model_features].copy()
         df["Score"] = model.predict_proba(X)[:, 1] if hasattr(model, "predict_proba") else model.predict(X)
 
-    # --- Preview table ---
-    df = df.sort_values("Score", ascending=False)
-    display_cols = [company_col, state_col, aum_col, "Score"]
-    st.dataframe(df[display_cols])
-
-    # --- MAP always renders ---
+    # --- MAP RENDERING ---
     st.markdown("### 🗺️ Map Visualization")
 
-    # Filter columns that exist and are in our mapped categories
     valid_color_features = [
         col for col in df.columns if (
-            col in YES_NO_COLUMNS
-            or col in ORDINAL_COLUMNS
-            or col in NUMERIC_COLUMNS
+            col in YES_NO_COLUMNS or
+            col in ORDINAL_COLUMNS or
+            col in NUMERIC_COLUMNS
         )
     ]
 
-    # Optional overlay selection
-    overlay_choice = st.radio(
-        "🎨 Optional Color Overlay:",
-        options=["None"] + sorted(valid_color_features),
-        horizontal=True
-    )
-    color_col = None if overlay_choice == "None" else overlay_choice
-
-    if color_col == "None":
-        color_col = None
+    selected_overlay = st.selectbox("🎨 Color Bubbles By:", ["None"] + sorted(valid_color_features))
+    color_feature = selected_overlay if selected_overlay != "None" else None
 
     try:
-        st.plotly_chart(plot_mapbox_scatter(df, color_feature=color_col), use_container_width=True)
+        st.plotly_chart(plot_mapbox_scatter(df, color_feature=color_feature), use_container_width=True)
     except Exception as e:
         st.warning(f"⚠️ Could not render color overlay: {e}")
         st.plotly_chart(plot_mapbox_scatter(df), use_container_width=True)
 
-    # --- Download file ---
+    # --- Download scored file ---
     buffer = io.BytesIO()
     df.to_csv(buffer, index=False)
     buffer.seek(0)
