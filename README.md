@@ -12,7 +12,7 @@
 
 ### Week 4
 - Email Semantic scoring (project 5)
-- Agent for quick DDQ and Tracey market reports generation and navigation (project )
+- Agent for quick DDQ and Tracey market reports generation and navigation
 - Documentation for agent
 
 ### Week 5
@@ -32,18 +32,6 @@
 - Muni research ideas + rough draft
 
 ### Week 7
-- Quant project Jai and Nikhil
-     - A study on minimizing tracking error for balance fund
-     - Black-Litterman for including investor expectations
-     - Factor models
-     - Quant audits
-
-- Fixed income project Alex and Brent?
-- Ideas: write a technical paper with a backtest on muni stuff
-     - Case study on muni index vs t-bill spread
-     - model default rates and recovery rates, maybe throw in MC simulations here
-     - something on trading pressure being skewed short term due to money managers running ladder strategies
-     - show some kind of carry style signal for muni trading but for spread, compare it to T bills
 
 ### Week 8
 
@@ -60,3 +48,64 @@
 ### RAM Pitch
 - About RAM
 - RAMs equity research process
+
+### Other
+- Quant project Jai and Nikhil
+     - A study on minimizing tracking error for balance fund
+     - Black-Litterman for including investor expectations
+     - Factor models
+     - Quant audits
+
+- Fixed income project Alex and Brent?
+- Ideas: write a technical paper with a backtest on muni stuff
+     - Case study on muni index vs t-bill spread
+     - model default rates and recovery rates, maybe throw in MC simulations here
+     - something on trading pressure being skewed short term due to money managers running ladder strategies
+     - show some kind of carry style signal for muni trading but for spread, compare it to T bills
+
+     
+
+
+                          ┌──────────────────────────────┐
+                          │ 🔐 Access Control             │
+                          │ - Password gate              │
+                          │ - App entry & routing        │
+                          │ → prospect_search.py         │
+                          └────────────▲─────────────────┘
+                                       │
+                          ┌────────────┴─────────────────┐
+                          │ 📡 Data Access                │
+                          │ - SOQL query to Salesforce   │
+                          │ - Secret management          │
+                          │ → data_loader.py             │
+                          └────────────▲─────────────────┘
+                                       │
+                          ┌────────────┴─────────────────┐
+                          │ 🧠 Semantic Scoring           │
+                          │ - Embed + rank contacts      │
+                          │ - Group by firm              │
+                          │ → semantic_ranker.py         │
+                          │ → contact_utils.py           │
+                          └────────────▲─────────────────┘
+                                       │
+                          ┌────────────┴─────────────────┐
+                          │ 🗺️ Visualization              │
+                          │ - Map (pydeck) + tables       │
+                          │ - Streamlit view layout       │
+                          │ → geo_utils.py                │
+                          │ → prospect_search.py          │
+                          └────────────▲─────────────────┘
+                                       │
+                          ┌────────────┴─────────────────┐
+                          │ 🌐 Contact Discovery          │
+                          │ - Scraping + SerpAPI         │
+                          │ - Email extraction (regex)   │
+                          │ → scraper_utils.py           │
+                          └────────────▲─────────────────┘
+                                       │
+                          ┌────────────┴─────────────────┐
+                          │ 🤖 AI Outreach                │
+                          │ - LLM-generated messages     │
+                          │ - Groq / Together API calls  │
+                          │ → outreach_utils.py          │
+                          └──────────────────────────────┘
