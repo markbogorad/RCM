@@ -9,7 +9,6 @@ import difflib
 # Set Mapbox token
 px.set_mapbox_access_token(MAPBOX_TOKEN)
 
-# --- Geocoding ---
 @st.cache_data(show_spinner=False)
 def geocode_address(address):
     geolocator = Nominatim(user_agent="rcm_mapbox")
@@ -20,7 +19,6 @@ def geocode_address(address):
     except:
         return (None, None)
 
-# --- Clean address fields ---
 def clean_address_field(val):
     if pd.isna(val):
         return ""
@@ -29,7 +27,6 @@ def clean_address_field(val):
     val = val.replace("’", "'").replace("“", '"').replace("”", '"')
     return val.strip()
 
-# --- Coordinate enrichment ---
 @st.cache_data(show_spinner=True)
 def enrich_with_coordinates(df):
     df.columns = (
@@ -39,7 +36,6 @@ def enrich_with_coordinates(df):
         .str.replace(" +", " ", regex=True)
     )
 
-    # Fuzzy match address fields
     required_fields = {
         "Dakota Billing Street": None,
         "Dakota Billing City": None,
@@ -60,12 +56,10 @@ def enrich_with_coordinates(df):
     state_col = required_fields["Dakota Billing State/Province"]
     zip_col = required_fields["Dakota Billing Zip/Postal Code"]
 
-    # U.S.-only
     country_col = next((c for c in df.columns if "Country" in c), None)
     if country_col:
         df = df[df[country_col].fillna("").str.upper() == "UNITED STATES"].copy()
 
-    # Clean and validate address fields
     df = df.dropna(subset=[street_col, city_col, state_col, zip_col])
     for col in [street_col, city_col, state_col, zip_col]:
         df[col] = df[col].apply(clean_address_field)
@@ -74,7 +68,6 @@ def enrich_with_coordinates(df):
         df[[street_col, city_col, state_col, zip_col]].apply(lambda row: all(str(x).strip() for x in row), axis=1)
     ].copy()
 
-    # Construct full address
     try:
         df["Full_Address"] = (
             df[street_col] + ", " +
@@ -88,7 +81,6 @@ def enrich_with_coordinates(df):
 
     df = df[df["Full_Address"].str.len() > 10]
 
-    # Geocode
     coords = df["Full_Address"].apply(geocode_address)
     df["Latitude"] = coords.apply(lambda x: x[0])
     df["Longitude"] = coords.apply(lambda x: x[1])
@@ -96,43 +88,46 @@ def enrich_with_coordinates(df):
 
     return df
 
-# --- Map rendering ---
 def plot_mapbox_scatter(df, color_feature=None, state_filter=None, aum_filter=None, fund_filter=None, invest_filter=None):
     df = enrich_with_coordinates(df)
     if df.empty:
         st.warning("⚠️ Map could not be generated: no valid geocoded data.")
         return None
 
-    # Apply filters (fuzzy column matching)
     def fuzzy_find(name):
         match = difflib.get_close_matches(name, df.columns, n=1, cutoff=0.7)
         return match[0] if match else None
 
-    state_col = fuzzy_find("Dakota Billing State/Province")
-    if state_filter and state_col:
-        df = df[df[state_col] == state_filter]
+    # Filter safely
+    if state_filter:
+        state_col = fuzzy_find("Dakota Billing State/Province")
+        if state_col in df.columns:
+            df = df[df[state_col] == state_filter]
 
-    aum_order_col = fuzzy_find("AUM Order")
-    if aum_filter and aum_order_col:
-        df = df[df[aum_order_col] == aum_filter]
+    if aum_filter:
+        aum_col = fuzzy_find("AUM Order")
+        if aum_col in df.columns:
+            df = df[df[aum_col] == aum_filter]
 
-    fund_col = fuzzy_find("Fund Usage")
-    if fund_filter and fund_col:
-        df = df[df[fund_col] == fund_filter]
+    if fund_filter:
+        fund_col = fuzzy_find("Fund Usage")
+        if fund_col in df.columns:
+            df = df[df[fund_col] == fund_filter]
 
-    invest_col = fuzzy_find("Invests In")
-    if invest_filter and invest_col:
-        df = df[df[invest_col] == invest_filter]
+    if invest_filter:
+        invest_col = fuzzy_find("Invests In")
+        if invest_col in df.columns:
+            df = df[df[invest_col] == invest_filter]
 
     if df.empty:
-        st.warning("⚠️ No matching prospects for selected filters.")
+        st.warning("⚠️ No matching prospects after filters.")
         return None
 
-    # Set core columns
+    # Core columns
     aum_col = next((c for c in df.columns if "Dakota AUM" in c), None)
     name_col = next((c for c in df.columns if "Account Name" in c and "Dakota" in c), "Provided Account Name")
 
-    # --- Color Overlay Logic ---
+    # --- Color Overlay ---
     color_type = "categorical"
     color_map = None
 
@@ -148,13 +143,20 @@ def plot_mapbox_scatter(df, color_feature=None, state_filter=None, aum_filter=No
         elif pd.api.types.is_numeric_dtype(df[color_feature]):
             color_type = "numeric"
 
-    # --- Size Logic ---
-    size_col = "Score" if "Score" in df.columns else aum_col
-    if size_col in df.columns:
-        df[size_col] = pd.to_numeric(df[size_col], errors="coerce")
-        df = df[df[size_col] > 0].copy()
-    else:
-        size_col = None
+    # --- Bubble Size ---
+    size_col = None
+    candidate_cols = ["Score", aum_col]
+    for col in candidate_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+            if df[col].max() > 0:
+                df = df[df[col] > 0]
+                size_col = col
+                break  # use first valid one
+
+    if df.empty:
+        st.warning("⚠️ No data with positive size for map bubbles.")
+        return None
 
     # --- Build Map ---
     fig = px.scatter_mapbox(
@@ -169,7 +171,7 @@ def plot_mapbox_scatter(df, color_feature=None, state_filter=None, aum_filter=No
         hover_name=name_col,
         hover_data=["Full_Address", aum_col, color_feature] if color_feature in df.columns else ["Full_Address", aum_col],
         zoom=3,
-        center={"lat": 37.0902, "lon": -95.7129},
+        center={"lat": 37.0902, "lon": -95.7129},  # USA center
         title=f"U.S. Prospects by {color_feature or 'Location'}"
     )
 
