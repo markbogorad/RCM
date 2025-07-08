@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import io
 import joblib
+import difflib
 
 from prospect_utils.geo_utils import plot_mapbox_scatter
 from prospect_utils.score_utils import rule_based_score
@@ -12,19 +13,23 @@ def load_model():
     features = joblib.load("models/model_features.pkl")
     return model, features
 
-# --- Whitelisted overlay fields for strategic filtering ---
-AUM_ORDER_COL = "AUM Order"
-
-FUND_USAGE_OPTIONS = [
+# --- Strategy filtering definitions ---
+AUM_ORDER_TARGET = "AUM Order"
+FUND_USAGE_COLUMNS = [
     "Dakota Hedge Funds", "Dakota Private Credit", "Dakota Private Equity",
     "Dakota Private Real Estate", "Dakota Real Assets", "Dakota Venture Capital"
 ]
-
-INVESTMENT_TAGS = [
+INVEST_TAG_COLUMNS = [
     "Dakota Invests in Impact, SRI or ESG",
     "Dakota Select Lists", "Dakota OCIO Business", "Dakota Models"
 ]
 
+# --- Utility to fuzzy match a column name ---
+def fuzzy_match(colname, df_cols):
+    match = difflib.get_close_matches(colname, df_cols, n=1, cutoff=0.7)
+    return match[0] if match else None
+
+# --- Main page logic ---
 def run_prospecting_page():
     st.subheader("📍 Prospecting Map & Scoring Tool")
 
@@ -35,13 +40,14 @@ def run_prospecting_page():
     df = pd.read_csv(uploaded_file, encoding='latin1')
     st.success(f"✅ Loaded {len(df)} records.")
 
-    # --- Column checks ---
-    aum_col = next((c for c in df.columns if "Dakota AUM" in c), None)
-    state_col = next((c for c in df.columns if "State" in c and "Dakota" in c), None)
-    company_col = next((c for c in df.columns if "Account Name" in c and "Dakota" in c), "Provided Account Name")
+    # --- Required columns ---
+    df_cols = df.columns.tolist()
+    aum_col = fuzzy_match("Dakota AUM", df_cols)
+    state_col = fuzzy_match("Dakota Billing State/Province", df_cols)
+    company_col = fuzzy_match("Dakota Account Name", df_cols) or "Provided Account Name"
 
     if not all([aum_col, state_col, company_col]):
-        st.error("❌ Missing required fields: Dakota AUM, Dakota Billing State/Province, or Account Name.")
+        st.error("❌ Required fields not found: Dakota AUM, Billing State, or Account Name.")
         st.stop()
 
     # --- Scoring ---
@@ -58,45 +64,50 @@ def run_prospecting_page():
         X = df[model_features].copy()
         df["Score"] = model.predict_proba(X)[:, 1] if hasattr(model, "predict_proba") else model.predict(X)
 
-    # --- Attribute filtering & coloring ---
+    # --- Filters ---
     st.markdown("### 🎯 Filter & Color by Strategy")
 
-    aum_order = None
-    fund_usage = None
-    invests_in = None
+    aum_order_filter = None
+    fund_usage_filter = None
+    invests_in_filter = None
     overlay_field = None
 
     with st.expander("Filter by:", expanded=True):
-        if AUM_ORDER_COL in df.columns:
-            aum_order = st.selectbox("• AUM Order", options=[""] + sorted(df[AUM_ORDER_COL].dropna().unique().tolist()))
+        # AUM Order dropdown
+        aum_order_col = fuzzy_match(AUM_ORDER_TARGET, df.columns)
+        if aum_order_col:
+            aum_order_vals = df[aum_order_col].dropna().unique().tolist()
+            aum_order_filter = st.selectbox("• AUM Order", [""] + sorted(aum_order_vals))
 
-        available_funds = [col for col in FUND_USAGE_OPTIONS if col in df.columns]
+        # Fund usage dropdown (show column names)
+        available_funds = [col for col in FUND_USAGE_COLUMNS if col in df.columns]
         if available_funds:
-            fund_usage = st.selectbox("• Fund Usage", options=[""] + available_funds)
+            fund_usage_filter = st.selectbox("• Fund Usage", [""] + available_funds)
 
-        available_invests = [col for col in INVESTMENT_TAGS if col in df.columns]
+        # Invests in dropdown (show column names)
+        available_invests = [col for col in INVEST_TAG_COLUMNS if col in df.columns]
         if available_invests:
-            invests_in = st.selectbox("• Invests In", options=[""] + available_invests)
+            invests_in_filter = st.selectbox("• Invests In", [""] + available_invests)
 
-    # --- Color overlay determined by user filter ---
-    overlay_field = fund_usage or invests_in or None
+    # Determine color overlay
+    overlay_field = fund_usage_filter or invests_in_filter or None
 
-    # --- Plot map ---
+    # --- Render Map ---
     try:
         st.plotly_chart(
             plot_mapbox_scatter(
                 df,
                 color_feature=overlay_field,
-                aum_filter=aum_order,
-                fund_filter=fund_usage,
-                invest_filter=invests_in
+                aum_filter=aum_order_filter if aum_order_filter else None,
+                fund_filter=fund_usage_filter if fund_usage_filter else None,
+                invest_filter=invests_in_filter if invests_in_filter else None
             ),
             use_container_width=True
         )
     except Exception as e:
         st.warning(f"⚠️ Could not render map: {e}")
 
-    # --- Download scored results ---
+    # --- Download scored file ---
     buffer = io.BytesIO()
     df.to_csv(buffer, index=False)
     buffer.seek(0)
