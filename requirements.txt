@@ -4,10 +4,14 @@ sentence-transformers
 torch
 streamlit
 pandas
-sentence-transformers
 serpapi>=0.1.4
 plotly>=5.13.0
 scikit-learn
 lightgbm
 joblib
 geopy>=2.4.0
+llama-index
+llama-index-readers-file
+agentbase
+openai  
+tqdm 

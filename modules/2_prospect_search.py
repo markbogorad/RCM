@@ -111,8 +111,12 @@ def run_prospecting_page():
     except Exception as e:
         st.warning(f"⚠️ Could not render map: {e}")
 
+    # --- Save final scored DataFrame to session state for RAG ---
+    st.session_state["scored_prospect_df"] = df
+
     # --- Download scored file ---
     buffer = io.BytesIO()
     df.to_csv(buffer, index=False)
     buffer.seek(0)
     st.download_button("📥 Download Scored Prospects", buffer, file_name="scored_prospects.csv")
+
