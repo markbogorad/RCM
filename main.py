@@ -16,6 +16,7 @@ def load_module_as(name, filepath):
 # --- Load Pages ---
 email_search_page = load_module_as("email_search_rank", "modules/1_email_search_rank.py")
 prospecting_page = load_module_as("prospecting_map", "modules/2_prospect_search.py")
+ai_outreach_page = load_module_as("ai_outreach", "modules/3_ai_outreach.py")
 
 # --- Streamlit App Config ---
 st.set_page_config(page_title="Wealth Research Toolkit", layout="wide")
@@ -24,7 +25,8 @@ st.markdown("<h1 style='text-align: center;'>🏛️ RAM Sales Research Toolkit<
 st.markdown("")
 
 # --- Top-Level Tabs ---
-tabs = st.tabs(["📧 Email Search", "📍 Prospecting", "AI Outreach (Coming Soon)"])
+# Then update your tabs block
+tabs = st.tabs(["📧 Email Search", "📍 Prospecting", "🤖 AI Outreach"])
 
 with tabs[0]:
     email_search_page.run_email_rank_page()
@@ -33,5 +35,4 @@ with tabs[1]:
     prospecting_page.run_prospecting_page()
 
 with tabs[2]:
-    st.subheader("AI Outreach (Coming Soon)")
-    st.info("More tools coming soon.")
+    ai_outreach_page.run_ai_outreach_page()
