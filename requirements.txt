@@ -12,6 +12,6 @@ joblib
 geopy>=2.4.0
 llama-index
 llama-index-readers-file
-agentbase
+git+https://github.com/f/agentbase.git
 openai  
 tqdm 
