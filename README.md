@@ -27,9 +27,10 @@
      - Weave in agents for LLM level inference
 
 ### Week 6
-- Prospecting demos (Kevin)
+- Prospecting demos (Kevin and Mark)
 - Prospecting tool demo this week
 - Muni research ideas + rough draft
+- Scale up agent 
 
 ### Week 7
 
@@ -63,7 +64,7 @@
      - something on trading pressure being skewed short term due to money managers running ladder strategies
      - show some kind of carry style signal for muni trading but for spread, compare it to T bills
 
-     
+
 
 
                           ┌──────────────────────────────┐
