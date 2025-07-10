@@ -5,6 +5,7 @@ from rcm_secrets import MAPBOX_TOKEN
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 import difflib
+from prospect_utils.data_loader import clean_address_field, prepare_address_dataframe
 
 # Set Mapbox token
 px.set_mapbox_access_token(MAPBOX_TOKEN)
@@ -19,73 +20,17 @@ def geocode_address(address):
     except:
         return (None, None)
 
-def clean_address_field(val):
-    if pd.isna(val):
-        return ""
-    val = str(val).encode("ascii", "ignore").decode("utf-8")
-    val = val.replace("\n", " ").replace("\r", " ")
-    val = val.replace("’", "'").replace("“", '"').replace("”", '"')
-    return val.strip()
-
 @st.cache_data(show_spinner=True)
 def enrich_with_coordinates(df):
-    df.columns = (
-        df.columns
-        .str.strip()
-        .str.replace("\xa0", " ")
-        .str.replace(" +", " ", regex=True)
-    )
-
-    required_fields = {
-        "Dakota Billing Street": None,
-        "Dakota Billing City": None,
-        "Dakota Billing State/Province": None,
-        "Dakota Billing Zip/Postal Code": None
-    }
-
-    for key in required_fields:
-        match = difflib.get_close_matches(key, df.columns, n=1, cutoff=0.8)
-        if match:
-            required_fields[key] = match[0]
-        else:
-            st.warning(f"⚠️ Missing required column: {key}")
-            return pd.DataFrame()
-
-    street_col = required_fields["Dakota Billing Street"]
-    city_col = required_fields["Dakota Billing City"]
-    state_col = required_fields["Dakota Billing State/Province"]
-    zip_col = required_fields["Dakota Billing Zip/Postal Code"]
-
-    country_col = next((c for c in df.columns if "Country" in c), None)
-    if country_col:
-        df = df[df[country_col].fillna("").str.upper() == "UNITED STATES"].copy()
-
-    df = df.dropna(subset=[street_col, city_col, state_col, zip_col])
-    for col in [street_col, city_col, state_col, zip_col]:
-        df[col] = df[col].apply(clean_address_field)
-
-    df = df[
-        df[[street_col, city_col, state_col, zip_col]].apply(lambda row: all(str(x).strip() for x in row), axis=1)
-    ].copy()
-
-    try:
-        df["Full_Address"] = (
-            df[street_col] + ", " +
-            df[city_col] + ", " +
-            df[state_col] + " " +
-            df[zip_col].astype(str)
-        )
-    except Exception as e:
-        st.warning(f"⚠️ Address formatting failed: {e}")
+    df = prepare_address_dataframe(df)
+    if df.empty or "Full_Address" not in df.columns:
+        st.warning("⚠️ Address preparation failed or missing required columns.")
         return pd.DataFrame()
-
-    df = df[df["Full_Address"].str.len() > 10]
 
     coords = df["Full_Address"].apply(geocode_address)
     df["Latitude"] = coords.apply(lambda x: x[0])
     df["Longitude"] = coords.apply(lambda x: x[1])
     df = df.dropna(subset=["Latitude", "Longitude"])
-
     return df
 
 def plot_mapbox_scatter(df, color_feature=None, state_filter=None, aum_filter=None, fund_filter=None, invest_filter=None):

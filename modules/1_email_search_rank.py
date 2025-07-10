@@ -140,15 +140,43 @@ def run_email_rank_page():
         else:
             st.success(f"Found {len(df)} rows. Starting batch search...")
 
+            found_emails = []
             for i, row in df.iterrows():
                 st.markdown(f"### 🔎 {i+1}. {row['First Name']} {row['Last Name']} ({row['Company']})")
                 with st.spinner("Scanning..."):
                     results, summary, word_freq = run_email_discovery(
                         row["First Name"], row["Last Name"], row["Company"], title=row.get("Title", None)
                     )
-
                 if results:
                     best_email, _, best_score = results[0]
                     st.markdown(f"**Top Email:** `{best_email}` — Score: `{best_score:.4f}`")
+                    found_emails.append(best_email)
                 else:
                     st.warning("No email found.")
+                    found_emails.append("")
+
+            # Add found emails to DataFrame
+            df["Found Email"] = found_emails
+
+            # Download buttons for CSV and Excel
+            st.markdown("### 📤 Download Results")
+            csv_buffer = io.BytesIO()
+            df.to_csv(csv_buffer, index=False)
+            csv_buffer.seek(0)
+            st.download_button(
+                label="📥 Download Results as CSV",
+                data=csv_buffer,
+                file_name="email_search_results.csv",
+                mime="text/csv"
+            )
+
+            excel_buffer = io.BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
+                df.to_excel(writer, index=False)
+            excel_buffer.seek(0)
+            st.download_button(
+                label="📥 Download Results as Excel",
+                data=excel_buffer,
+                file_name="email_search_results.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
