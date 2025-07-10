@@ -14,9 +14,13 @@ from email_utils.scraper_utils import (
     match_username_to_name,
 )
 
-def run_email_discovery(first, last, company, title=None):
+def run_email_discovery(first, last, company, title=None, bulk=False):
     name = f"{first} {last}"
-    search_results = run_reverse_search(first, last, company, title=title, max_results=7)
+    if bulk:
+        search_results, status = run_reverse_search(first, last, company, title=title, max_results=7, bulk=True)
+    else:
+        search_results = run_reverse_search(first, last, company, title=title, max_results=7, bulk=False)
+        status = None
 
     all_candidates = []
     all_context_blocks = []
@@ -45,7 +49,10 @@ def run_email_discovery(first, last, company, title=None):
     summary = summarize_hits(scored)
     word_freq = compute_word_frequencies(all_context_blocks)
 
-    return scored, summary, word_freq
+    if bulk:
+        return scored, status
+    else:
+        return scored, summary, word_freq
 
 def run_email_rank_page():
     st.subheader("📧 Email Search & Semantic Scoring")
@@ -145,16 +152,16 @@ def run_email_rank_page():
             for i, row in df.iterrows():
                 st.markdown(f"### 🔎 {i+1}. {row['First Name']} {row['Last Name']} ({row['Company']})")
                 with st.spinner("Scanning..."):
-                    # Use bulk=True for batch
                     results, status = run_email_discovery(
                         row["First Name"], row["Last Name"], row["Company"], title=row.get("Title", None), bulk=True
                     )
                 api_statuses.append(status)
-                st.info(f"API used: {status['api']} | Searches this month: {status['count']} / {status['quota']}")
-                if status.get("quota_exceeded"):
-                    st.warning("ContextualWeb API quota exceeded! Falling back to SerpAPI.")
-                if status.get("fallback"):
-                    st.info("Used SerpAPI as a fallback for this search.")
+                if status is not None:
+                    st.info(f"API used: {status['api']} | Searches this month: {status['count']} / {status['quota']}")
+                    if status.get("quota_exceeded"):
+                        st.warning("ContextualWeb API quota exceeded! Falling back to SerpAPI.")
+                    if status.get("fallback"):
+                        st.info("Used SerpAPI as a fallback for this search.")
                 if results:
                     best_email, _, best_score = results[0]
                     st.markdown(f"**Top Email:** `{best_email}` — Score: `{best_score:.4f}`")
