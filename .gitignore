@@ -3,4 +3,4 @@ email_utils/config.py
 modules/__pycache__
 documentation/*.docx
 !docsdocumentation/*.pdf
-secrets.toml
+rcm_secrets.py
