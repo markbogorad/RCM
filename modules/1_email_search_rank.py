@@ -141,12 +141,20 @@ def run_email_rank_page():
             st.success(f"Found {len(df)} rows. Starting batch search...")
 
             found_emails = []
+            api_statuses = []
             for i, row in df.iterrows():
                 st.markdown(f"### 🔎 {i+1}. {row['First Name']} {row['Last Name']} ({row['Company']})")
                 with st.spinner("Scanning..."):
-                    results, summary, word_freq = run_email_discovery(
-                        row["First Name"], row["Last Name"], row["Company"], title=row.get("Title", None)
+                    # Use bulk=True for batch
+                    results, status = run_email_discovery(
+                        row["First Name"], row["Last Name"], row["Company"], title=row.get("Title", None), bulk=True
                     )
+                api_statuses.append(status)
+                st.info(f"API used: {status['api']} | Searches this month: {status['count']} / {status['quota']}")
+                if status.get("quota_exceeded"):
+                    st.warning("ContextualWeb API quota exceeded! Falling back to SerpAPI.")
+                if status.get("fallback"):
+                    st.info("Used SerpAPI as a fallback for this search.")
                 if results:
                     best_email, _, best_score = results[0]
                     st.markdown(f"**Top Email:** `{best_email}` — Score: `{best_score:.4f}`")

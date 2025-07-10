@@ -12,3 +12,4 @@ streamlit
 torch
 transformers
 tqdm 
+xlsxwriter 
