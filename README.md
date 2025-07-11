@@ -28,11 +28,17 @@
 
 ### Week 6
 - Prospecting demos (Kevin and Mark)
-- Prospecting tool demo this week
+- Prospecting tool refactor
+     - Ideas: switch to operate on Salesforce data, integrate in Salesforce via Visualforce/iframe/embedding, have key visuals
+- API swap test for email tool - 1k max searches (not working well) and improved bulk feature
 - Muni research ideas + rough draft
 - Scale up agent 
+- Travel outreach agent
 
 ### Week 7
+- Data clean final
+- Prospecting tool rough draft
+- Email scraper to agent conversion
 
 ### Week 8
 
