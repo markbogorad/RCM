@@ -39,18 +39,22 @@
 - Data clean final
 - Prospecting tool rough draft
 - Email scraper to agent conversion
+- Copilot Agents Demo Video
 
 ### Week 8
 
 ### Week 9
+- Sales pitch presentation
 
 ### Week 10
-- Presentation
-     - RAM pitch (2 mins)
-     - What I did with tech - story to sales pitch
-     - Sales process
-     - Where RAM differentiates itself and the final application
-- Do project 1 sometime here (sales pitch), maybe pitch high yeild muni
+- Summer Analyst presentation
+     - Team I'm on
+     - Overview of RAM
+     - How are we positioned to add value and how we build a differentiatied approach
+     - What I did - agentic architecture
+     - Show impact
+     - Transition into forward thinking
+     - Presentation shuld flow like a funnel
 
 ### RAM Pitch
 - About RAM
