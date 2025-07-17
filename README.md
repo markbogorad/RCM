@@ -37,43 +37,19 @@
 
 ### Week 7
 - Data clean final
-- Prospecting tool rough draft
 - Email scraper to agent conversion
-- Copilot Agents Demo Video
+- Copilot with bonds - excel add in
+- Prospecting agent + manual on St. Louis
 
 ### Week 8
+- Copilot Agents Demo Video
+- Slides due
 
 ### Week 9
-- Sales pitch presentation
+- Pitch presentation
 
 ### Week 10
 - Summer Analyst presentation
-     - Team I'm on
-     - Overview of RAM
-     - How are we positioned to add value and how we build a differentiatied approach
-     - What I did - agentic architecture
-     - Show impact
-     - Transition into forward thinking
-     - Presentation shuld flow like a funnel
-
-### RAM Pitch
-- About RAM
-- RAMs equity research process
-
-### Other
-- Quant project Jai and Nikhil
-     - A study on minimizing tracking error for balance fund
-     - Black-Litterman for including investor expectations
-     - Factor models
-     - Quant audits
-
-- Fixed income project Alex and Brent?
-- Ideas: write a technical paper with a backtest on muni stuff
-     - Case study on muni index vs t-bill spread
-     - model default rates and recovery rates, maybe throw in MC simulations here
-     - something on trading pressure being skewed short term due to money managers running ladder strategies
-     - show some kind of carry style signal for muni trading but for spread, compare it to T bills
-
 
 
 
