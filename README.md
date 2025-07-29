@@ -46,9 +46,11 @@
 - Final presentation slides rough draft
 - Copilot Agents Demo Video for Sales
 - Copilot demo for non sales
+- Updated Dakota salesforce merge
 
 ### Week 9
-
+- Aug 4 presentation
+- Kevin contacts merge
 
 ### Week 10
 - Summer Analyst presentation
