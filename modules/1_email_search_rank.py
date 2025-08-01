@@ -17,16 +17,23 @@ from email_utils.scraper_utils import (
 def run_email_discovery(first, last, company, title=None, bulk=False):
     name = f"{first} {last}"
     if bulk:
-        search_results, status = run_reverse_search(first, last, company, title=title, max_results=7, bulk=True)
+        search_results, status = run_reverse_search(
+            first, last, company, title=title, max_results=7, bulk=True
+        )
     else:
-        search_results = run_reverse_search(first, last, company, title=title, max_results=7, bulk=False)
+        search_results = run_reverse_search(
+            first, last, company, title=title, max_results=7, bulk=False
+        )
         status = None
+
+    # 🔧 Normalize here (fixes the AttributeError)
+    search_results = _normalize_search_results(search_results)
 
     all_candidates = []
     all_context_blocks = []
 
     for result in search_results:
-        url = result.get("link")
+        url = result.get("link")        # now safe
         if not url:
             continue
 
@@ -41,7 +48,8 @@ def run_email_discovery(first, last, company, title=None, bulk=False):
         for email in found_emails:
             username = email.split("@")[0]
             if match_username_to_name(username, first, last):
-                context = next((s for s in snippets if username in s), snippets[0] if snippets else "")
+                context = next((s for s in snippets if username in s),
+                               snippets[0] if snippets else "")
                 all_candidates.append((email, context))
 
     reference_embeddings = get_reference_embeddings()
@@ -49,10 +57,7 @@ def run_email_discovery(first, last, company, title=None, bulk=False):
     summary = summarize_hits(scored)
     word_freq = compute_word_frequencies(all_context_blocks)
 
-    if bulk:
-        return scored, status
-    else:
-        return scored, summary, word_freq
+    return (scored, status) if bulk else (scored, summary, word_freq)
 
 def run_email_rank_page():
     st.subheader("📧 Email Search & Semantic Scoring")
@@ -195,3 +200,36 @@ def run_email_rank_page():
                 file_name="email_search_results.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+
+from collections.abc import Mapping
+
+def _normalize_search_results(obj):
+    """Flatten nested lists/tuples and normalize to dicts with 'link','title','snippet'."""
+    def walk(x):
+        if isinstance(x, (list, tuple)):
+            for y in x:
+                yield from walk(y)
+        else:
+            yield x
+
+    out = []
+    for item in walk(obj or []):
+        if isinstance(item, Mapping):
+            link = item.get("link") or item.get("url") or item.get("href")
+            if link:
+                out.append({
+                    "link": link,
+                    "title": item.get("title") or item.get("name") or "",
+                    "snippet": item.get("snippet") or item.get("description") or "",
+                })
+        elif isinstance(item, str):
+            # If a raw URL string slips through
+            out.append({"link": item, "title": "", "snippet": ""})
+
+    # Dedupe by link
+    seen, dedup = set(), []
+    for d in out:
+        if d["link"] not in seen:
+            seen.add(d["link"])
+            dedup.append(d)
+    return dedup
